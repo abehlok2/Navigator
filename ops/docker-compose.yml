@@ -1,15 +1,35 @@
-version: '3'
+version: '3.8'
 services:
   signal:
     image: node:20
+    working_dir: /app
+    volumes:
+      - ../apps/signal:/app
     command: node dist/server.js
+    ports:
+      - "8080:8080"
+
   turn:
     image: coturn/coturn
+    command: ["-c", "/etc/coturn/turnserver.conf"]
     ports:
       - "3478:3478"
+      - "3478:3478/udp"
       - "5349:5349"
+      - "5349:5349/udp"
+    volumes:
+      - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
+    environment:
+      - TURN_EXTERNAL_IP=${TURN_EXTERNAL_IP:-}
+
   caddy:
-    image: caddy
+    image: caddy:2
+    profiles: ["tls"]
+    depends_on:
+      - signal
     ports:
       - "80:80"
       - "443:443"
+    volumes:
+      - ./caddy.json:/etc/caddy/caddy.json:ro
+    command: ["run", "--config", "/etc/caddy/caddy.json"]
