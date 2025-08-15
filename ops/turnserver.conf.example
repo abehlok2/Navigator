@@ -1,0 +1,5 @@
+listening-port=3478
+fingerprint
+use-auth-secret
+static-auth-secret=your-secret
+realm=turn.example.com
