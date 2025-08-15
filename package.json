@@ -1,0 +1,14 @@
+{
+  "name": "explorer-sessions",
+  "private": true,
+  "packageManager": "pnpm@9",
+  "scripts": {
+    "dev:web": "pnpm -C apps/web dev",
+    "build:web": "pnpm -C apps/web build",
+    "serve:web": "pnpm -C apps/web preview",
+    "dev:signal": "pnpm -C apps/signal ts-node src/server.ts",
+    "start:signal": "node apps/signal/dist/server.js",
+    "lint": "eslint . --ext .ts,.tsx",
+    "typecheck": "tsc -b"
+  }
+}

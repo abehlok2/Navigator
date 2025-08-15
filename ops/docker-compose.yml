@@ -1,0 +1,15 @@
+version: '3'
+services:
+  signal:
+    image: node:20
+    command: node dist/server.js
+  turn:
+    image: coturn/coturn
+    ports:
+      - "3478:3478"
+      - "5349:5349"
+  caddy:
+    image: caddy
+    ports:
+      - "80:80"
+      - "443:443"
