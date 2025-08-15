@@ -4,7 +4,16 @@
       "servers": {
         "example": {
           "listen": [":443"],
-          "routes": []
+          "routes": [
+            {
+              "handle": [
+                {
+                  "handler": "reverse_proxy",
+                  "upstreams": [{ "dial": "signal:8080" }]
+                }
+              ]
+            }
+          ]
         }
       }
     }
