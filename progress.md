@@ -15,7 +15,6 @@
 
 ### Next steps
 
-
 - Add unit tests for authentication and room management.
 - Implement session expiration and cleanup for inactive participants.
 
