@@ -1,8 +1,8 @@
 import express from 'express';
-import { createServer } from 'http';
-import { WebSocketServer } from 'ws';
-import { authenticate } from './auth.js';
-import { messageSchema, roleSchema } from './types.js';
+import { createServer, IncomingMessage } from 'http';
+import { WebSocketServer, type WebSocket, type RawData } from 'ws';
+import { authenticate, login, register } from './auth.js';
+import { messageSchema, roleSchema, type Role } from './types.js';
 import {
   createRoom,
   addParticipant,
@@ -23,13 +23,53 @@ const TURN_CONFIG = {
 const app = express();
 app.use(express.json());
 
-app.post('/rooms', (_req, res) => {
+function authMiddleware(requiredRole?: Role) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const header = req.headers.authorization || '';
+    const token = header.split(' ')[1];
+    const payload = authenticate(token);
+    if (!payload || (requiredRole && payload.role !== requiredRole)) {
+      res.sendStatus(403);
+      return;
+    }
+    (req as any).user = payload;
+    next();
+  };
+}
+
+const credSchema = z.object({ username: z.string(), password: z.string(), role: roleSchema.optional() });
+
+app.post('/register', async (req, res) => {
+  try {
+    const { username, password, role } = credSchema.parse(req.body);
+    await register(username, password, role);
+    res.sendStatus(201);
+  } catch {
+    res.status(400).json({ error: 'invalid request or user exists' });
+  }
+});
+
+app.post('/login', async (req, res) => {
+  try {
+    const { username, password } = credSchema.omit({ role: true }).parse(req.body);
+    const token = await login(username, password);
+    if (!token) {
+      res.status(401).json({ error: 'invalid credentials' });
+      return;
+    }
+    res.json({ token });
+  } catch {
+    res.status(400).json({ error: 'invalid request' });
+  }
+});
+
+app.post('/rooms', authMiddleware('facilitator'), (_req, res) => {
   const room = createRoom();
   res.json({ roomId: room.id });
 });
 
 const joinBody = z.object({ role: roleSchema });
-app.post('/rooms/:roomId/join', (req, res) => {
+app.post('/rooms/:roomId/join', authMiddleware(), (req, res) => {
   try {
     const { role } = joinBody.parse(req.body);
     const participant = addParticipant(req.params.roomId, role);
@@ -39,13 +79,13 @@ app.post('/rooms/:roomId/join', (req, res) => {
   }
 });
 
-app.post('/rooms/:roomId/leave', (req, res) => {
+app.post('/rooms/:roomId/leave', authMiddleware(), (req, res) => {
   const { participantId } = req.body as { participantId: string };
   removeParticipant(req.params.roomId, participantId);
   res.sendStatus(204);
 });
 
-app.post('/rooms/:roomId/role', (req, res) => {
+app.post('/rooms/:roomId/role', authMiddleware('facilitator'), (req, res) => {
   const { participantId, role } = req.body as { participantId: string; role: any };
   try {
     setRole(req.params.roomId, participantId, roleSchema.parse(role));
@@ -58,13 +98,14 @@ app.post('/rooms/:roomId/role', (req, res) => {
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
-wss.on('connection', (ws, req) => {
+wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
   const params = new URLSearchParams(req.url?.split('?')[1]);
   const token = params.get('token') ?? '';
   const roomId = params.get('roomId') ?? '';
   const participantId = params.get('participantId') ?? '';
 
-  if (!authenticate(token)) {
+  const payload = authenticate(token);
+  if (!payload) {
     ws.close();
     return;
   }
@@ -77,7 +118,7 @@ wss.on('connection', (ws, req) => {
 
   attachSocket(roomId, participantId, ws);
 
-  ws.on('message', data => {
+  ws.on('message', (data: RawData) => {
     try {
       const msg = messageSchema.parse(JSON.parse(data.toString()));
       const target = getParticipant(roomId, msg.target);
