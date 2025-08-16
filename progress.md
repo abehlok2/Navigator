@@ -10,5 +10,5 @@
 
 ### Next steps
 
-- Add persistent storage for rooms and credentials.
-- Implement robust authentication and authorization.
+- Add persistent storage for rooms and credentials (rooms are currently kept in-memory in `apps/signal/src/rooms.ts`).
+- Implement robust authentication and authorization (the `authenticate` helper in `apps/signal/src/auth.ts` uses a static secret).
