@@ -30,3 +30,14 @@
 - Integrate connection workflow with UI components.
 - Add reconnection handling and telemetry messaging.
 
+## 2025-08-17
+
+- [x] Implemented control-plane protocol with JSON envelope and schemas.
+- [x] Added transaction IDs with ack handling for reliable messaging.
+- [x] Wired heartbeat keepalive and basic error reporting on the control channel.
+
+### Next steps
+
+- Hook command handlers into the Explorer audio engine.
+- Surface connection and heartbeat status in the UI.
+
