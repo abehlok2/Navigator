@@ -1,4 +1,5 @@
 import type { Role } from '../session/api';
+import { ControlChannel } from '../control/channel';
 
 interface ConnectOptions {
   roomId: string;
@@ -7,13 +8,18 @@ interface ConnectOptions {
   token: string;
   turn: RTCIceServer[];
   role: Role;
+  version: string;
   onTrack: (ev: RTCTrackEvent) => void;
   onDataChannel?: (dc: RTCDataChannel) => void;
+  onControlError?: (err: string) => void;
 }
 
-export async function connect(opts: ConnectOptions): Promise<{ pc: RTCPeerConnection; dc?: RTCDataChannel }> {
+export async function connect(
+  opts: ConnectOptions
+): Promise<{ pc: RTCPeerConnection; dc?: RTCDataChannel; control?: ControlChannel }> {
   const pc = new RTCPeerConnection({ iceServers: opts.turn });
   let dataChannel: RTCDataChannel | undefined;
+  let control: ControlChannel | undefined;
 
   const ws = new WebSocket(
     `ws://localhost:8080?roomId=${opts.roomId}&participantId=${opts.participantId}&token=${opts.token}`
@@ -36,10 +42,22 @@ export async function connect(opts: ConnectOptions): Promise<{ pc: RTCPeerConnec
 
   if (opts.role === 'facilitator') {
     dataChannel = pc.createDataChannel('control', { ordered: true });
+    control = new ControlChannel(dataChannel, {
+      role: opts.role,
+      roomId: opts.roomId,
+      version: opts.version,
+      onError: opts.onControlError,
+    });
     opts.onDataChannel?.(dataChannel);
   } else {
     pc.ondatachannel = ev => {
       dataChannel = ev.channel;
+      control = new ControlChannel(dataChannel!, {
+        role: opts.role,
+        roomId: opts.roomId,
+        version: opts.version,
+        onError: opts.onControlError,
+      });
       opts.onDataChannel?.(dataChannel!);
     };
   }
@@ -93,5 +111,5 @@ export async function connect(opts: ConnectOptions): Promise<{ pc: RTCPeerConnec
     });
   }
 
-  return { pc, dc: dataChannel };
+  return { pc, dc: dataChannel, control };
 }
