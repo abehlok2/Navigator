@@ -8,10 +8,16 @@
 - [x] Replaced echo signal server with room handling, auth and message routing.
 - [x] Added TURN/STUN credential exchange, SDP/ICE forwarding and schema validation.
 
+## 2025-08-16
+
+- [x] Added persistent storage for rooms and user credentials backed by JSON files.
+- [x] Implemented JWT-based authentication with role-based authorization.
+
 ### Next steps
 
-- Add persistent storage for rooms and credentials.
-- Implement robust authentication and authorization.
+
+- Add unit tests for authentication and room management.
+- Implement session expiration and cleanup for inactive participants.
 
 ## 2025-08-16
 
@@ -23,3 +29,4 @@
 
 - Integrate connection workflow with UI components.
 - Add reconnection handling and telemetry messaging.
+
