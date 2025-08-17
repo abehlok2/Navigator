@@ -50,3 +50,15 @@
 - Integrate `PeerClock` with the audio scheduling engine.
 - Add safeguards for clock drift and reconnection.
 
+
+## 2025-08-19
+
+- [x] Initialized shared AudioContext with user gesture unlocking.
+- [x] Added drag-drop asset preloading with manifest matching.
+- [x] Implemented FilePlayer, generators, scheduling helper and crossfades.
+- [x] Added speech-controlled ducking and optional local recording.
+
+### Next steps
+
+- Wire audio subsystem into UI components.
+- Add tests for scheduling and recording consent flows.
