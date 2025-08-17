@@ -12,6 +12,7 @@ interface ControlChannelOptions {
   roomId: string;
   version: string;
   onError?: (err: string) => void;
+  onClockPong?: (pong: { pingId: string; responderNow: number }) => void;
 }
 
 interface Pending {
@@ -24,7 +25,6 @@ export class ControlChannel {
   private dc: RTCDataChannel;
   private opts: ControlChannelOptions;
   private pending = new Map<string, Pending>();
-  private heartbeat?: ReturnType<typeof setInterval>;
 
   constructor(dc: RTCDataChannel, opts: ControlChannelOptions) {
     this.dc = dc;
@@ -32,7 +32,11 @@ export class ControlChannel {
     this.dc.addEventListener('open', () => this.onOpen());
     this.dc.addEventListener('message', ev => this.onMessage(ev));
     this.dc.addEventListener('error', () => this.opts.onError?.('data channel error'));
-    this.dc.addEventListener('close', () => this.stopHeartbeat());
+    this.dc.addEventListener('close', () => {});
+  }
+
+  setClockPongHandler(handler: (pong: { pingId: string; responderNow: number }) => void) {
+    this.opts.onClockPong = handler;
   }
 
   private onOpen() {
@@ -41,18 +45,6 @@ export class ControlChannel {
       roomId: this.opts.roomId,
       version: this.opts.version,
     }).catch(err => this.opts.onError?.(err.message));
-    this.startHeartbeat();
-  }
-
-  private startHeartbeat() {
-    this.heartbeat = setInterval(() => {
-      const pingId = this.newId();
-      this.send('clock.ping', { pingId }, false).catch(err => this.opts.onError?.(err.message));
-    }, 5000);
-  }
-
-  private stopHeartbeat() {
-    if (this.heartbeat) clearInterval(this.heartbeat);
   }
 
   private onMessage(ev: MessageEvent) {
@@ -86,6 +78,12 @@ export class ControlChannel {
         this.send('clock.pong', { pingId: ping.pingId, responderNow: performance.now() }, false).catch(err =>
           this.opts.onError?.(err.message)
         );
+        break;
+      }
+      case 'clock.pong': {
+        this.sendAck(msg.txn, true);
+        const pong = msg.payload as { pingId: string; responderNow: number };
+        this.opts.onClockPong?.(pong);
         break;
       }
       default: {

@@ -40,3 +40,13 @@
 - Hook command handlers into the Explorer audio engine.
 - Surface connection and heartbeat status in the UI.
 
+## 2025-08-18
+
+- [x] Implemented periodic ping/pong clock sync every 3 s with RTT/offset calculation.
+- [x] Exposed `PeerClock` abstraction for audio scheduling.
+
+### Next steps
+
+- Integrate `PeerClock` with the audio scheduling engine.
+- Add safeguards for clock drift and reconnection.
+
