@@ -74,7 +74,7 @@ export async function connect(
     });
     setup(dataChannel, control);
     opts.onDataChannel?.(dataChannel);
-  } else {
+  } else if (opts.role === 'explorer') {
     pc.ondatachannel = ev => {
       dataChannel = ev.channel;
       control = new ControlChannel(dataChannel!, {
@@ -88,16 +88,18 @@ export async function connect(
     };
   }
 
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: {
-      echoCancellation: true,
-      noiseSuppression: true,
-      channelCount: 1,
-      latency: { ideal: 0 },
-    } as any,
-    video: false,
-  });
-  stream.getTracks().forEach(track => pc.addTrack(track, stream));
+  if (opts.role !== 'listener') {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        channelCount: 1,
+        latency: { ideal: 0 },
+      } as any,
+      video: false,
+    });
+    stream.getTracks().forEach(track => pc.addTrack(track, stream));
+  }
 
   ws.onmessage = async ev => {
     const msg = JSON.parse(ev.data);

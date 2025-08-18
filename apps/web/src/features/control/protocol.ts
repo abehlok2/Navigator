@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const helloSchema = z.object({
-  role: z.enum(['facilitator', 'explorer']),
+  role: z.enum(['facilitator', 'explorer', 'listener']),
   roomId: z.string(),
   version: z.string(),
 });
