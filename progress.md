@@ -62,3 +62,14 @@
 
 - Wire audio subsystem into UI components.
 - Add tests for scheduling and recording consent flows.
+
+## 2025-08-20
+
+- [x] Implemented facilitator control interface with command helpers over the DataChannel.
+- [x] Added Zustand session store tracking role, connection status and asset presence.
+- [x] Linked asset preload and connection lifecycle to maintain session state.
+
+### Next steps
+
+- Build facilitator UI elements to trigger commands.
+- Sync asset presence and telemetry between peers.
