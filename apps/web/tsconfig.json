@@ -10,7 +10,8 @@
     "forceConsistentCasingInFileNames": true,
     "rootDir": "src",
     "outDir": "dist",
-    "composite": true
+    "composite": true,
+    "types": ["vite/client"]
   },
   "include": ["src"]
 }
