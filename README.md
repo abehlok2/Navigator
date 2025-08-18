@@ -9,6 +9,10 @@ Configure the following environment variables before running the signal server i
 
 - `JWT_SECRET` – strong secret used to sign authentication tokens. The server refuses to start without it.
 - `SESSION_TIMEOUT_MS` – optional timeout in milliseconds after which inactive participants are removed (defaults to 1800000).
+- `STUN_URLS` – comma-separated STUN server URLs (defaults to `stun:stun.l.google.com:19302`).
+- `TURN_URLS` – comma-separated TURN server URLs.
+- `TURN_USERNAME` – TURN server username.
+- `TURN_PASSWORD` – TURN server password.
 
 Use HTTPS and a secure reverse proxy in deployment to protect credentials and tokens.
 
@@ -19,6 +23,7 @@ Navigator is a monorepo designed to facilitate consciousness exploration. It con
 
 - [Node.js](https://nodejs.org/) (v18 or newer)
 - [pnpm](https://pnpm.io/)
+- [coturn](https://github.com/coturn/coturn) (STUN/TURN server)
 
 ## Installation
 
