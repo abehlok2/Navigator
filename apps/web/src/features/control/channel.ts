@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Role } from '../session/api';
+import { useSessionStore } from '../../state/session';
 import {
   wireMessageSchema,
   payloadSchemaByType,
@@ -10,6 +11,7 @@ import {
   type CmdCrossfade,
   type CmdSetGain,
   type CmdDucking,
+  type Telemetry,
 } from './protocol';
 
 interface ControlChannelOptions {
@@ -89,6 +91,19 @@ export class ControlChannel {
         this.sendAck(msg.txn, true);
         const pong = msg.payload as { pingId: string; responderNow: number };
         this.opts.onClockPong?.(pong);
+        break;
+      }
+      case 'manifest.presence': {
+        this.sendAck(msg.txn, true);
+        const { addAsset } = useSessionStore.getState();
+        const { have } = msg.payload as { have: string[] };
+        have.forEach(id => addAsset(id));
+        break;
+      }
+      case 'telemetry': {
+        this.sendAck(msg.txn, true);
+        const { setTelemetry } = useSessionStore.getState();
+        setTelemetry(msg.payload as Telemetry);
         break;
       }
       default: {

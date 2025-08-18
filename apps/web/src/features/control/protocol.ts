@@ -60,6 +60,18 @@ export const cmdDuckingSchema = z.object({
 });
 export type CmdDucking = z.infer<typeof cmdDuckingSchema>;
 
+export const manifestPresenceSchema = z.object({
+  have: z.array(z.string()),
+});
+export type ManifestPresence = z.infer<typeof manifestPresenceSchema>;
+
+export const telemetrySchema = z.object({
+  rms: z.number(),
+  peak: z.number(),
+  playing: z.array(z.string()),
+});
+export type Telemetry = z.infer<typeof telemetrySchema>;
+
 export const payloadSchemaByType = {
   hello: helloSchema,
   ack: ackSchema,
@@ -70,6 +82,8 @@ export const payloadSchemaByType = {
   'cmd.crossfade': cmdCrossfadeSchema,
   'cmd.setGain': cmdSetGainSchema,
   'cmd.ducking': cmdDuckingSchema,
+  'manifest.presence': manifestPresenceSchema,
+  telemetry: telemetrySchema,
 } as const;
 
 export const messageTypes = Object.keys(payloadSchemaByType) as [keyof typeof payloadSchemaByType];
