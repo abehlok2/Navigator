@@ -1,12 +1,31 @@
 import { useEffect, useRef } from 'react';
 
 let shared: AudioContext | null = null;
+let master: GainNode | null = null;
+let analyser: AnalyserNode | null = null;
 
 export function getAudioContext(): AudioContext {
   if (!shared) {
     shared = new AudioContext();
   }
   return shared;
+}
+
+export function getMasterGain(): GainNode {
+  const ctx = getAudioContext();
+  if (!master) {
+    master = ctx.createGain();
+    analyser = ctx.createAnalyser();
+    analyser.fftSize = 256;
+    master.connect(analyser);
+    analyser.connect(ctx.destination);
+  }
+  return master;
+}
+
+export function getAnalyser(): AnalyserNode {
+  if (!analyser) getMasterGain();
+  return analyser!;
 }
 
 /**

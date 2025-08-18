@@ -1,4 +1,4 @@
-import { getAudioContext } from './context';
+import { getAudioContext, getMasterGain } from './context';
 
 function dbToGain(db: number): number {
   return Math.pow(10, db / 20);
@@ -15,7 +15,7 @@ export class FilePlayer {
     this.ctx = getAudioContext();
     this.buffer = buffer;
     this.gainNode = this.ctx.createGain();
-    this.gainNode.connect(this.ctx.destination);
+    this.gainNode.connect(getMasterGain());
   }
 
   start(when = 0, offset = 0) {
@@ -49,6 +49,10 @@ export class FilePlayer {
 
   getGainNode() {
     return this.gainNode;
+  }
+
+  isPlaying() {
+    return this.source !== null;
   }
 }
 
