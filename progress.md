@@ -90,6 +90,11 @@
 - [x] Added reconnection logic and telemetry heartbeat handling.
 - [x] Surfaced connection and heartbeat status indicators in the UI.
 
+## 2025-08-23
+
+- [x] Built facilitator dashboard showing asset availability and telemetry metrics.
+- [x] Cleared telemetry on disconnect so reconnection resends state and telemetry.
+
 ### Next steps
 
-- Build facilitator UI to display asset availability and telemetry metrics.
+- Expand automated tests for facilitator workflows.

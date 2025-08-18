@@ -69,6 +69,7 @@ export async function connect(
       session.setPeerClock(null);
       session.setConnection('disconnected');
       session.setControl(null);
+      session.setTelemetry(null);
     });
   }
 

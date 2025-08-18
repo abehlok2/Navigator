@@ -19,7 +19,7 @@ interface SessionState {
   setControl: (control: ControlChannel | null) => void;
   setPeerClock: (clock: PeerClock | null) => void;
   addAsset: (id: string) => void;
-  setTelemetry: (t: Telemetry) => void;
+  setTelemetry: (t: Telemetry | null) => void;
   setHeartbeat: () => void;
 }
 
