@@ -4,7 +4,7 @@ import { createServer as createHttpServer, type IncomingMessage } from 'http';
 import { readFileSync, existsSync } from 'fs';
 import { WebSocketServer, type WebSocket, type RawData } from 'ws';
 import rateLimit from 'express-rate-limit';
-import { authenticate, login, register, revokeToken, cleanupExpiredTokens } from './auth.js';
+import { authenticate, login, register, revokeToken, cleanupExpiredTokens, type AuthPayload } from './auth.js';
 import { messageSchema, roleSchema, type Role } from './types.js';
 import {
   createRoom,
@@ -104,6 +104,11 @@ const joinBody = z.object({ role: roleSchema });
 app.post('/rooms/:roomId/join', authMiddleware(), (req, res) => {
   try {
     const { role } = joinBody.parse(req.body);
+    const user = (req as any).user as AuthPayload;
+    if (role !== user.role) {
+      res.status(403).json({ error: 'role mismatch' });
+      return;
+    }
     const participant = addParticipant(req.params.roomId, role);
     res.json({ participantId: participant.id, turn: TURN_CONFIG });
   } catch {
@@ -131,6 +136,7 @@ const keyFile = process.env.SSL_KEY_FILE || 'key.pem';
 const certFile = process.env.SSL_CERT_FILE || 'cert.pem';
 const useHttps = existsSync(keyFile) && existsSync(certFile);
 
+const useHttps = existsSync(keyFile) && existsSync(certFile);
 let server;
 if (useHttps) {
   server = createHttpsServer(
@@ -152,7 +158,7 @@ setInterval(() => cleanupExpiredTokens(TOKEN_TIMEOUT_MS), TOKEN_TIMEOUT_MS);
 
 wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
   const params = new URLSearchParams(req.url?.split('?')[1]);
-  const token = params.get('token') ?? '';
+  const token = (req.headers['sec-websocket-protocol'] as string | undefined)?.split(',')[0]?.trim() ?? '';
   const roomId = params.get('roomId') ?? '';
   const participantId = params.get('participantId') ?? '';
 

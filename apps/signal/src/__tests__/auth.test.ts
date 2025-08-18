@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { StoredUser } from '../storage.js';
 
 let userStore: Record<string, StoredUser> = {};
@@ -13,7 +13,11 @@ vi.mock('../storage.js', () => ({
 beforeEach(() => {
   userStore = {};
   vi.resetModules();
-  process.env.JWT_SECRET = 'testsecret';
+  vi.stubEnv('JWT_SECRET', 'testsecret');
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 describe('auth', () => {

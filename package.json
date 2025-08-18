@@ -3,6 +3,11 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@9.0.0",
+  "pnpm": {
+    "overrides": {
+      "esbuild": "^0.25.0"
+    }
+  },
   "scripts": {
     "dev:web": "pnpm -C apps/web dev",
     "build:web": "pnpm -C apps/web build",
