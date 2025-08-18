@@ -94,7 +94,7 @@ export async function connect(
       noiseSuppression: true,
       channelCount: 1,
       latency: { ideal: 0 },
-    },
+    } as any,
     video: false,
   });
   stream.getTracks().forEach(track => pc.addTrack(track, stream));
