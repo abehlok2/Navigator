@@ -2,6 +2,8 @@ import type { Role } from '../session/api';
 import { ControlChannel } from '../control/channel';
 import { useSessionStore } from '../../state/session';
 import { startTelemetry } from '../audio/telemetry';
+import { PeerClock } from '../audio/peerClock';
+import { watchClock } from '../audio/scheduler';
 
 export interface ConnectOptions {
   roomId: string;
@@ -46,6 +48,7 @@ export async function connect(
   pc.ontrack = opts.onTrack;
 
   let stopTelemetry: (() => void) | undefined;
+  let peerClock: PeerClock | undefined;
 
   function setup(dc: RTCDataChannel, ctrl: ControlChannel) {
     dc.addEventListener('open', () => {
@@ -54,11 +57,16 @@ export async function connect(
       const have = Array.from(useSessionStore.getState().assets);
       if (have.length) ctrl.send('manifest.presence', { have }, false).catch(() => {});
       if (opts.role === 'explorer') {
+        peerClock = new PeerClock(ctrl);
+        watchClock(peerClock);
+        session.setPeerClock(peerClock);
         stopTelemetry = startTelemetry(ctrl);
       }
     });
     dc.addEventListener('close', () => {
       stopTelemetry?.();
+      peerClock?.stop();
+      session.setPeerClock(null);
       session.setConnection('disconnected');
       session.setControl(null);
     });

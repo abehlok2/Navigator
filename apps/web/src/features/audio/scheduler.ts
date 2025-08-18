@@ -4,6 +4,7 @@ import { getBuffer } from './assets';
 import { FilePlayer, crossfade } from './filePlayer';
 
 const players = new Map<string, FilePlayer>();
+let detachClock: (() => void) | null = null;
 
 /**
  * Schedules playback of a previously loaded asset at the specified peer time.
@@ -52,4 +53,20 @@ export function getPlaying(): string[] {
     if (player.isPlaying()) ids.push(id);
   });
   return ids;
+}
+
+export function watchClock(clock: PeerClock, thresholdMs = 100) {
+  detachClock?.();
+  let last = clock.getOffset();
+  detachClock = clock.onUpdate(offset => {
+    if (Math.abs(offset - last) > thresholdMs) {
+      players.forEach(player => {
+        if (player.isPlaying()) {
+          const pos = player.getPosition();
+          player.seek(pos);
+        }
+      });
+    }
+    last = offset;
+  });
 }

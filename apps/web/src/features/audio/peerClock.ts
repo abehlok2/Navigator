@@ -12,6 +12,7 @@ export class PeerClock {
   private rtt = 0;
   private pending = new Map<string, number>();
   private timer: ReturnType<typeof setInterval>;
+  private listeners = new Set<(offset: number, rtt: number) => void>();
 
   constructor(control: ControlChannel) {
     this.control = control;
@@ -39,6 +40,7 @@ export class PeerClock {
     const rtt = recvAt - sentAt;
     this.rtt = rtt;
     this.offset = pong.responderNow - (sentAt + rtt / 2);
+    this.listeners.forEach(l => l(this.offset, this.rtt));
   }
 
   /**
@@ -58,5 +60,10 @@ export class PeerClock {
 
   stop() {
     clearInterval(this.timer);
+  }
+
+  onUpdate(listener: (offset: number, rtt: number) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
   }
 }
