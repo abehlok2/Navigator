@@ -1,4 +1,5 @@
 import { getAudioContext } from './context';
+import { useSessionStore } from '../../state/session';
 
 export type Manifest = Record<string, string>; // id -> filename
 const buffers = new Map<string, AudioBuffer>();
@@ -12,6 +13,7 @@ export async function handleDrop(e: DragEvent, manifest: Manifest): Promise<void
   const list = e.dataTransfer?.files;
   if (!list) return;
   const ctx = getAudioContext();
+  const { addAsset } = useSessionStore.getState();
   await Promise.all(
     Array.from(list).map(async file => {
       const id = Object.keys(manifest).find(key => manifest[key] === file.name);
@@ -19,6 +21,7 @@ export async function handleDrop(e: DragEvent, manifest: Manifest): Promise<void
       const array = await file.arrayBuffer();
       const buffer = await ctx.decodeAudioData(array);
       buffers.set(id, buffer);
+      addAsset(id);
     })
   );
 }

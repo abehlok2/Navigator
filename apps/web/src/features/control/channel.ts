@@ -5,6 +5,11 @@ import {
   payloadSchemaByType,
   type WireMessage,
   type Ack,
+  type CmdPlay,
+  type CmdStop,
+  type CmdCrossfade,
+  type CmdSetGain,
+  type CmdDucking,
 } from './protocol';
 
 interface ControlChannelOptions {
@@ -139,5 +144,25 @@ export class ControlChannel {
         timer,
       });
     });
+  }
+
+  play(cmd: CmdPlay) {
+    return this.send('cmd.play', cmd);
+  }
+
+  stop(cmd: CmdStop) {
+    return this.send('cmd.stop', cmd);
+  }
+
+  crossfade(cmd: CmdCrossfade) {
+    return this.send('cmd.crossfade', cmd);
+  }
+
+  setGain(cmd: CmdSetGain) {
+    return this.send('cmd.setGain', cmd);
+  }
+
+  ducking(cmd: CmdDucking) {
+    return this.send('cmd.ducking', cmd);
   }
 }

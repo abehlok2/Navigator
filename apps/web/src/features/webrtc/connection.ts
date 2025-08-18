@@ -1,5 +1,6 @@
 import type { Role } from '../session/api';
 import { ControlChannel } from '../control/channel';
+import { useSessionStore } from '../../state/session';
 
 interface ConnectOptions {
   roomId: string;
@@ -20,6 +21,9 @@ export async function connect(
   const pc = new RTCPeerConnection({ iceServers: opts.turn });
   let dataChannel: RTCDataChannel | undefined;
   let control: ControlChannel | undefined;
+  const session = useSessionStore.getState();
+  session.setRole(opts.role);
+  session.setConnection('connecting');
 
   const ws = new WebSocket(
     `ws://localhost:8080?roomId=${opts.roomId}&participantId=${opts.participantId}&token=${opts.token}`
@@ -48,6 +52,8 @@ export async function connect(
       version: opts.version,
       onError: opts.onControlError,
     });
+    dataChannel.addEventListener('open', () => session.setConnection('connected'));
+    dataChannel.addEventListener('close', () => session.setConnection('disconnected'));
     opts.onDataChannel?.(dataChannel);
   } else {
     pc.ondatachannel = ev => {
@@ -58,6 +64,8 @@ export async function connect(
         version: opts.version,
         onError: opts.onControlError,
       });
+      dataChannel!.addEventListener('open', () => session.setConnection('connected'));
+      dataChannel!.addEventListener('close', () => session.setConnection('disconnected'));
       opts.onDataChannel?.(dataChannel!);
     };
   }
