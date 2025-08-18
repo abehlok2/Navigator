@@ -1,7 +1,10 @@
 import express from 'express';
-import { createServer, IncomingMessage } from 'http';
+import { createServer } from 'https';
+import type { IncomingMessage } from 'http';
+import { readFileSync } from 'fs';
 import { WebSocketServer, type WebSocket, type RawData } from 'ws';
-import { authenticate, login, register } from './auth.js';
+import rateLimit from 'express-rate-limit';
+import { authenticate, login, register, revokeToken, cleanupExpiredTokens } from './auth.js';
 import { messageSchema, roleSchema, type Role } from './types.js';
 import {
   createRoom,
@@ -26,6 +29,7 @@ const app = express();
 app.use(express.json());
 
 const SESSION_TIMEOUT_MS = Number(process.env.SESSION_TIMEOUT_MS ?? 30 * 60 * 1000);
+const TOKEN_TIMEOUT_MS = Number(process.env.TOKEN_INACTIVITY_MS ?? 15 * 60 * 1000);
 
 function authMiddleware(requiredRole?: Role) {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -41,9 +45,19 @@ function authMiddleware(requiredRole?: Role) {
   };
 }
 
-const credSchema = z.object({ username: z.string(), password: z.string(), role: roleSchema.optional() });
+const usernameSchema = z.string().min(3).max(32).regex(/^[a-zA-Z0-9_-]+$/);
+const passwordSchema = z
+  .string()
+  .min(8)
+  .max(128)
+  .regex(/[a-z]/)
+  .regex(/[A-Z]/)
+  .regex(/[0-9]/);
+const credSchema = z.object({ username: usernameSchema, password: passwordSchema, role: roleSchema.optional() });
 
-app.post('/register', async (req, res) => {
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10 });
+
+app.post('/register', authLimiter, async (req, res) => {
   try {
     const { username, password, role } = credSchema.parse(req.body);
     await register(username, password, role);
@@ -53,7 +67,7 @@ app.post('/register', async (req, res) => {
   }
 });
 
-app.post('/login', async (req, res) => {
+app.post('/login', authLimiter, async (req, res) => {
   try {
     const { username, password } = credSchema.omit({ role: true }).parse(req.body);
     const token = await login(username, password);
@@ -65,6 +79,13 @@ app.post('/login', async (req, res) => {
   } catch {
     res.status(400).json({ error: 'invalid request' });
   }
+});
+
+app.post('/logout', authMiddleware(), (req, res) => {
+  const header = req.headers.authorization || '';
+  const token = header.split(' ')[1];
+  if (token) revokeToken(token);
+  res.sendStatus(204);
 });
 
 app.post('/rooms', authMiddleware('facilitator'), (_req, res) => {
@@ -99,10 +120,17 @@ app.post('/rooms/:roomId/role', authMiddleware('facilitator'), (req, res) => {
   }
 });
 
-const server = createServer(app);
+const server = createServer(
+  {
+    key: readFileSync(process.env.SSL_KEY_FILE || 'key.pem'),
+    cert: readFileSync(process.env.SSL_CERT_FILE || 'cert.pem'),
+  },
+  app,
+);
 const wss = new WebSocketServer({ server });
 
 setInterval(() => cleanupInactiveParticipants(SESSION_TIMEOUT_MS), SESSION_TIMEOUT_MS);
+setInterval(() => cleanupExpiredTokens(TOKEN_TIMEOUT_MS), TOKEN_TIMEOUT_MS);
 
 wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
   const params = new URLSearchParams(req.url?.split('?')[1]);
@@ -146,6 +174,6 @@ wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
 });
 
 server.listen(8080, () => {
-  console.log('Signal server running on http://localhost:8080');
+  console.log('Signal server running on https://localhost:8080');
 });
 
