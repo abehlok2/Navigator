@@ -11,6 +11,7 @@ import {
   type CmdStop,
   type CmdCrossfade,
   type CmdSetGain,
+  type CmdDucking,
   type Telemetry,
 } from './protocol';
 
