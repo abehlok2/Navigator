@@ -52,6 +52,10 @@ export function getRoom(id: string): Room | undefined {
 export function addParticipant(roomId: string, role: Role): Participant {
   const room = rooms.get(roomId);
   if (!room) throw new Error('room not found');
+  if (role === 'listener') {
+    const listeners = Array.from(room.participants.values()).filter(p => p.role === 'listener').length;
+    if (listeners >= 5) throw new Error('listener limit reached');
+  }
   const participant: Participant = { id: randomUUID(), role, lastActive: Date.now() };
   room.participants.set(participant.id, participant);
   persist();

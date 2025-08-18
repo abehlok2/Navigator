@@ -155,6 +155,10 @@ wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
 
   ws.on('message', (data: RawData) => {
     touchParticipant(roomId, participantId);
+    if (participant.role === 'listener') {
+      // listeners are read-only
+      return;
+    }
     try {
       const msg = messageSchema.parse(JSON.parse(data.toString()));
       const target = getParticipant(roomId, msg.target);
