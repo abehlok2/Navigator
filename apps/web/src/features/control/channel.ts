@@ -91,6 +91,8 @@ export class ControlChannel {
         this.sendAck(msg.txn, true);
         const pong = msg.payload as { pingId: string; responderNow: number };
         this.opts.onClockPong?.(pong);
+        const { setHeartbeat } = useSessionStore.getState();
+        setHeartbeat();
         break;
       }
       case 'manifest.presence': {
@@ -102,8 +104,9 @@ export class ControlChannel {
       }
       case 'telemetry': {
         this.sendAck(msg.txn, true);
-        const { setTelemetry } = useSessionStore.getState();
+        const { setTelemetry, setHeartbeat } = useSessionStore.getState();
         setTelemetry(msg.payload as Telemetry);
+        setHeartbeat();
         break;
       }
       default: {

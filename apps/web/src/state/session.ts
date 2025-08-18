@@ -11,11 +11,13 @@ interface SessionState {
   assets: Set<string>;
   control: ControlChannel | null;
   telemetry: Telemetry | null;
+  lastHeartbeat: number | null;
   setRole: (role: Role) => void;
   setConnection: (status: ConnectionStatus) => void;
   setControl: (control: ControlChannel | null) => void;
   addAsset: (id: string) => void;
   setTelemetry: (t: Telemetry) => void;
+  setHeartbeat: () => void;
 }
 
 export const useSessionStore = create<SessionState>(set => ({
@@ -24,6 +26,7 @@ export const useSessionStore = create<SessionState>(set => ({
   assets: new Set(),
   control: null,
   telemetry: null,
+  lastHeartbeat: null,
   setRole: role => set({ role }),
   setConnection: status => set({ connection: status }),
   setControl: control => set({ control }),
@@ -37,4 +40,5 @@ export const useSessionStore = create<SessionState>(set => ({
       return { assets: next };
     }),
   setTelemetry: t => set({ telemetry: t }),
+  setHeartbeat: () => set({ lastHeartbeat: Date.now() }),
 }));
