@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --loader ts-node/esm src/server.ts"
+    "dev": "TS_NODE_TRANSPILE_ONLY=1 node --loader ts-node/esm src/server.ts"
   },
   "dependencies": {
     "express": "^4.19.2",
