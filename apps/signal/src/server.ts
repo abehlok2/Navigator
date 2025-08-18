@@ -19,10 +19,17 @@ import {
 } from './rooms.js';
 import { z } from 'zod';
 
+function parseUrls(value?: string) {
+  return value?.split(',').map((u) => u.trim()).filter(Boolean) ?? [];
+}
+
 const TURN_CONFIG = {
-  urls: ['stun:stun.l.google.com:19302'],
-  username: 'user',
-  credential: 'pass',
+  urls: [
+    ...parseUrls(process.env.STUN_URLS ?? 'stun:stun.l.google.com:19302'),
+    ...parseUrls(process.env.TURN_URLS),
+  ],
+  username: process.env.TURN_USERNAME,
+  credential: process.env.TURN_PASSWORD,
 };
 
 const app = express();
