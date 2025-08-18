@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const roleSchema = z.enum(['facilitator', 'explorer']);
+export const roleSchema = z.enum(['facilitator', 'explorer', 'listener']);
 
 export const sdpMessage = z.object({
   type: z.literal('sdp'),

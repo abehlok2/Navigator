@@ -28,8 +28,12 @@ export async function connect(
   session.setRole(opts.role);
   session.setConnection('connecting');
 
+
+  const signalUrl =
+    import.meta.env.VITE_SIGNAL_URL ?? 'ws://localhost:8080';
   const ws = new WebSocket(
-    `ws://localhost:8080?roomId=${opts.roomId}&participantId=${opts.participantId}&token=${opts.token}`
+    `${signalUrl}?roomId=${opts.roomId}&participantId=${opts.participantId}&token=${opts.token}`
+
   );
 
   pc.onicecandidate = ev => {
@@ -83,7 +87,7 @@ export async function connect(
     });
     setup(dataChannel, control);
     opts.onDataChannel?.(dataChannel);
-  } else {
+  } else if (opts.role === 'explorer') {
     pc.ondatachannel = ev => {
       dataChannel = ev.channel;
       control = new ControlChannel(dataChannel!, {
@@ -97,16 +101,18 @@ export async function connect(
     };
   }
 
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: {
-      echoCancellation: true,
-      noiseSuppression: true,
-      channelCount: 1,
-      latency: { ideal: 0 },
-    } as any,
-    video: false,
-  });
-  stream.getTracks().forEach(track => pc.addTrack(track, stream));
+  if (opts.role !== 'listener') {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        channelCount: 1,
+        latency: { ideal: 0 },
+      } as any,
+      video: false,
+    });
+    stream.getTracks().forEach(track => pc.addTrack(track, stream));
+  }
 
   ws.onmessage = async ev => {
     const msg = JSON.parse(ev.data);

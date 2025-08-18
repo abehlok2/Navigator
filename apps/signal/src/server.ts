@@ -19,10 +19,17 @@ import {
 } from './rooms.js';
 import { z } from 'zod';
 
+function parseUrls(value?: string) {
+  return value?.split(',').map((u) => u.trim()).filter(Boolean) ?? [];
+}
+
 const TURN_CONFIG = {
-  urls: ['stun:stun.l.google.com:19302'],
-  username: 'user',
-  credential: 'pass',
+  urls: [
+    ...parseUrls(process.env.STUN_URLS ?? 'stun:stun.l.google.com:19302'),
+    ...parseUrls(process.env.TURN_URLS),
+  ],
+  username: process.env.TURN_USERNAME,
+  credential: process.env.TURN_PASSWORD,
 };
 
 const app = express();
@@ -122,6 +129,7 @@ app.post('/rooms/:roomId/role', authMiddleware('facilitator'), (req, res) => {
 
 const keyFile = process.env.SSL_KEY_FILE || 'key.pem';
 const certFile = process.env.SSL_CERT_FILE || 'cert.pem';
+
 let server;
 if (existsSync(keyFile) && existsSync(certFile)) {
   server = createHttpsServer(
@@ -135,6 +143,7 @@ if (existsSync(keyFile) && existsSync(certFile)) {
   console.warn('SSL certificates not found; starting HTTP server');
   server = createHttpServer(app);
 }
+
 const wss = new WebSocketServer({ server });
 
 setInterval(() => cleanupInactiveParticipants(SESSION_TIMEOUT_MS), SESSION_TIMEOUT_MS);
@@ -163,6 +172,10 @@ wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
 
   ws.on('message', (data: RawData) => {
     touchParticipant(roomId, participantId);
+    if (participant.role === 'listener') {
+      // listeners are read-only
+      return;
+    }
     try {
       const msg = messageSchema.parse(JSON.parse(data.toString()));
       const target = getParticipant(roomId, msg.target);
@@ -182,6 +195,6 @@ wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
 });
 
 server.listen(8080, () => {
-  console.log('Signal server running on https://localhost:8080');
+  console.log(`Signal server running on ${useHttps ? 'https' : 'http'}://localhost:8080`);
 });
 

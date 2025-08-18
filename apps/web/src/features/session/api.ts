@@ -1,4 +1,4 @@
-export type Role = 'facilitator' | 'explorer';
+export type Role = 'facilitator' | 'explorer' | 'listener';
 
 const BASE_URL = 'http://localhost:8080';
 
