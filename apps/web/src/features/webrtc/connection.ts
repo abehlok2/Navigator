@@ -28,8 +28,9 @@ export async function connect(
   session.setRole(opts.role);
   session.setConnection('connecting');
 
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
   const ws = new WebSocket(
-    `ws://localhost:8080?roomId=${opts.roomId}&participantId=${opts.participantId}&token=${opts.token}`
+    `${wsProtocol}://${location.hostname}:8080?roomId=${opts.roomId}&participantId=${opts.participantId}&token=${opts.token}`
   );
 
   pc.onicecandidate = ev => {

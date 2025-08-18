@@ -1,7 +1,7 @@
 import express from 'express';
-import { createServer } from 'https';
-import type { IncomingMessage } from 'http';
-import { readFileSync } from 'fs';
+import { createServer as createHttpsServer } from 'https';
+import { createServer as createHttpServer, type IncomingMessage } from 'http';
+import { readFileSync, existsSync } from 'fs';
 import { WebSocketServer, type WebSocket, type RawData } from 'ws';
 import rateLimit from 'express-rate-limit';
 import { authenticate, login, register, revokeToken, cleanupExpiredTokens } from './auth.js';
@@ -120,13 +120,19 @@ app.post('/rooms/:roomId/role', authMiddleware('facilitator'), (req, res) => {
   }
 });
 
-const server = createServer(
-  {
-    key: readFileSync(process.env.SSL_KEY_FILE || 'key.pem'),
-    cert: readFileSync(process.env.SSL_CERT_FILE || 'cert.pem'),
-  },
-  app,
-);
+const keyFile = process.env.SSL_KEY_FILE || 'key.pem';
+const certFile = process.env.SSL_CERT_FILE || 'cert.pem';
+const useHttps = existsSync(keyFile) && existsSync(certFile);
+
+const server = useHttps
+  ? createHttpsServer(
+      {
+        key: readFileSync(keyFile),
+        cert: readFileSync(certFile),
+      },
+      app,
+    )
+  : createHttpServer(app);
 const wss = new WebSocketServer({ server });
 
 setInterval(() => cleanupInactiveParticipants(SESSION_TIMEOUT_MS), SESSION_TIMEOUT_MS);
@@ -178,6 +184,6 @@ wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
 });
 
 server.listen(8080, () => {
-  console.log('Signal server running on https://localhost:8080');
+  console.log(`Signal server running on ${useHttps ? 'https' : 'http'}://localhost:8080`);
 });
 
