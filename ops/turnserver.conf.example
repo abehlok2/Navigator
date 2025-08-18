@@ -1,8 +1,8 @@
 listening-port=3478
 tls-listening-port=5349
 fingerprint
-use-auth-secret
-static-auth-secret=your-secret
+lt-cred-mech
+user=your-user:your-pass
 realm=turn.example.com
 external-ip=YOUR_PUBLIC_IP
 cert=/etc/coturn/tls/cert.pem
