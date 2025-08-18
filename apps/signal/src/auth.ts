@@ -2,10 +2,16 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { loadUsers, saveUsers, StoredUser } from './storage.js';
 
-const JWT_SECRET = process.env.JWT_SECRET as string;
-if (!JWT_SECRET) {
+const DEFAULT_SECRET = 'dev-secret';
+let jwtSecret =
+  process.env.JWT_SECRET ?? (process.env.NODE_ENV === 'production' ? undefined : DEFAULT_SECRET);
+if (!jwtSecret) {
   throw new Error('JWT_SECRET not set');
 }
+if (jwtSecret === DEFAULT_SECRET) {
+  console.warn('JWT_SECRET not set; using default development secret');
+}
+const JWT_SECRET: string = jwtSecret;
 
 const TOKEN_INACTIVITY_MS = Number(process.env.TOKEN_INACTIVITY_MS ?? 15 * 60 * 1000);
 const activeTokens = new Map<string, number>();

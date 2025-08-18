@@ -129,17 +129,21 @@ app.post('/rooms/:roomId/role', authMiddleware('facilitator'), (req, res) => {
 
 const keyFile = process.env.SSL_KEY_FILE || 'key.pem';
 const certFile = process.env.SSL_CERT_FILE || 'cert.pem';
-const useHttps = existsSync(keyFile) && existsSync(certFile);
 
-const server = useHttps
-  ? createHttpsServer(
-      {
-        key: readFileSync(keyFile),
-        cert: readFileSync(certFile),
-      },
-      app,
-    )
-  : createHttpServer(app);
+let server;
+if (existsSync(keyFile) && existsSync(certFile)) {
+  server = createHttpsServer(
+    {
+      key: readFileSync(keyFile),
+      cert: readFileSync(certFile),
+    },
+    app,
+  );
+} else {
+  console.warn('SSL certificates not found; starting HTTP server');
+  server = createHttpServer(app);
+}
+
 const wss = new WebSocketServer({ server });
 
 setInterval(() => cleanupInactiveParticipants(SESSION_TIMEOUT_MS), SESSION_TIMEOUT_MS);
