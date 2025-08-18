@@ -1,6 +1,7 @@
 {
   "name": "explorer-sessions",
   "private": true,
+  "type": "module",
   "packageManager": "pnpm@9.0.0",
   "scripts": {
     "dev:web": "pnpm -C apps/web dev",
@@ -10,5 +11,13 @@
     "start:signal": "node apps/signal/dist/server.js",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc -b"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.9.0",
+    "@typescript-eslint/eslint-plugin": "^8.39.0",
+    "@typescript-eslint/parser": "^8.39.0",
+    "globals": "^15.9.0",
+    "eslint": "^9.9.0",
+    "typescript": "^5.9.2"
   }
 }
