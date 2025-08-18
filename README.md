@@ -63,6 +63,20 @@ Start the Vite development server:
 pnpm dev:web
 ```
 
+When deploying on a personal machine, set the signal server host and port for the web client using the `VITE_SIGNAL_URL` environment variable. It defaults to `ws://localhost:8080`.
+
+Create an `.env` file in `apps/web`:
+
+```bash
+VITE_SIGNAL_URL=ws://your-host:8080
+```
+
+or export the variable when running commands:
+
+```bash
+VITE_SIGNAL_URL=ws://your-host:8080 pnpm dev:web
+```
+
 ### Signal server
 
 Run the signal server with live reloading:

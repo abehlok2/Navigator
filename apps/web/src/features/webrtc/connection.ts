@@ -28,9 +28,12 @@ export async function connect(
   session.setRole(opts.role);
   session.setConnection('connecting');
 
-  const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+
+  const signalUrl =
+    import.meta.env.VITE_SIGNAL_URL ?? 'ws://localhost:8080';
   const ws = new WebSocket(
-    `${wsProtocol}://${location.hostname}:8080?roomId=${opts.roomId}&participantId=${opts.participantId}&token=${opts.token}`
+    `${signalUrl}?roomId=${opts.roomId}&participantId=${opts.participantId}&token=${opts.token}`
+
   );
 
   pc.onicecandidate = ev => {
