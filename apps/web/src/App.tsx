@@ -1,6 +1,9 @@
 import React from 'react';
 import ConnectionStatus from './features/session/ConnectionStatus';
 import { connectWithReconnection } from './features/webrtc/connection';
+import AssetDropZone from './features/ui/AssetDropZone';
+import FacilitatorControls from './features/ui/FacilitatorControls';
+import TelemetryDisplay from './features/ui/TelemetryDisplay';
 
 export default function App() {
   const handleConnect = () => {
@@ -10,7 +13,7 @@ export default function App() {
       targetId: 'p2',
       token: 'token',
       turn: [],
-      role: 'explorer',
+      role: 'facilitator',
       version: '1',
       onTrack: () => {},
     });
@@ -20,6 +23,9 @@ export default function App() {
     <div>
       <h1>Explorer Sessions</h1>
       <ConnectionStatus />
+      <AssetDropZone />
+      <FacilitatorControls />
+      <TelemetryDisplay />
       <button onClick={handleConnect}>Connect</button>
     </div>
   );
