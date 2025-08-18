@@ -9,6 +9,7 @@ Configure the following environment variables before running the signal server i
 
 - `JWT_SECRET` – strong secret used to sign authentication tokens. The server refuses to start without it.
 - `SESSION_TIMEOUT_MS` – optional timeout in milliseconds after which inactive participants are removed (defaults to 1800000).
+- `TOKEN_INACTIVITY_MS` – optional timeout in milliseconds after which inactive tokens are rejected (defaults to 900000).
 
 - `SSL_KEY_FILE` – path to the TLS private key used for HTTPS.
 - `SSL_CERT_FILE` – path to the TLS certificate.
@@ -21,20 +22,27 @@ Configure the following environment variables before running the signal server i
 
 Use HTTPS and a secure reverse proxy in deployment to protect credentials and tokens.
 
-To create a self-signed certificate for testing, run:
+### Generating a JWT secret
+
+Generate a strong JWT secret and store it outside version control:
 
 ```bash
-openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -sha256 -days 365 -nodes
+echo "JWT_SECRET=$(openssl rand -base64 32)" >> .env
 ```
 
-For production certificates from [Let's Encrypt](https://letsencrypt.org/), install
-[Certbot](https://certbot.eff.org/) and request a certificate:
+The `.env` file is ignored by Git but should still have restrictive permissions.
+
+### Configuring timeouts for small deployments
+
+For smaller deployments, tune the session and token timeouts to free resources promptly. Example `.env` settings:
 
 ```bash
-sudo certbot certonly --standalone -d example.com
+SESSION_TIMEOUT_MS=1800000     # remove inactive participants after 30 minutes
+TOKEN_INACTIVITY_MS=900000     # invalidate tokens idle for 15 minutes
 ```
 
-Set `SSL_KEY_FILE` to the generated `privkey.pem` and `SSL_CERT_FILE` to `fullchain.pem`.
+Adjust the values as needed for your environment.
+
 
 
 Navigator is a monorepo designed to facilitate consciousness exploration. It contains a web interface and a signal processing server.
