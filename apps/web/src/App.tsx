@@ -2,6 +2,7 @@ import React from 'react';
 import ConnectionStatus from './features/session/ConnectionStatus';
 import { connectWithReconnection } from './features/webrtc/connection';
 import AssetDropZone from './features/ui/AssetDropZone';
+import AssetAvailability from './features/ui/AssetAvailability';
 import FacilitatorControls from './features/ui/FacilitatorControls';
 import TelemetryDisplay from './features/ui/TelemetryDisplay';
 
@@ -24,6 +25,7 @@ export default function App() {
       <h1>Explorer Sessions</h1>
       <ConnectionStatus />
       <AssetDropZone />
+      <AssetAvailability />
       <FacilitatorControls />
       <TelemetryDisplay />
       <button onClick={handleConnect}>Connect</button>

@@ -16,7 +16,7 @@ interface SessionState {
   setConnection: (status: ConnectionStatus) => void;
   setControl: (control: ControlChannel | null) => void;
   addAsset: (id: string) => void;
-  setTelemetry: (t: Telemetry) => void;
+  setTelemetry: (t: Telemetry | null) => void;
   setHeartbeat: () => void;
 }
 

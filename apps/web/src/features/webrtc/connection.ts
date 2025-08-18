@@ -61,6 +61,7 @@ export async function connect(
       stopTelemetry?.();
       session.setConnection('disconnected');
       session.setControl(null);
+      session.setTelemetry(null);
     });
   }
 
