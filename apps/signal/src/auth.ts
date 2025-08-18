@@ -7,6 +7,9 @@ if (!JWT_SECRET) {
   throw new Error('JWT_SECRET not set');
 }
 
+const TOKEN_INACTIVITY_MS = Number(process.env.TOKEN_INACTIVITY_MS ?? 15 * 60 * 1000);
+const activeTokens = new Map<string, number>();
+
 let users: Record<string, StoredUser> = await loadUsers();
 
 export async function register(username: string, password: string, role: string = 'explorer') {
@@ -21,7 +24,9 @@ export async function login(username: string, password: string): Promise<string 
   if (!user) return null;
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) return null;
-  return jwt.sign({ username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
+  const token = jwt.sign({ username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
+  activeTokens.set(token, Date.now());
+  return token;
 }
 
 export interface AuthPayload {
@@ -31,9 +36,30 @@ export interface AuthPayload {
 
 export function authenticate(token: string): AuthPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as jwt.JwtPayload as AuthPayload;
+    const payload = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload as AuthPayload;
+    const lastActive = activeTokens.get(token);
+    if (!lastActive) return null;
+    if (Date.now() - lastActive > TOKEN_INACTIVITY_MS) {
+      activeTokens.delete(token);
+      return null;
+    }
+    activeTokens.set(token, Date.now());
+    return payload;
   } catch {
     return null;
+  }
+}
+
+export function revokeToken(token: string): void {
+  activeTokens.delete(token);
+}
+
+export function cleanupExpiredTokens(timeoutMs: number = TOKEN_INACTIVITY_MS): void {
+  const now = Date.now();
+  for (const [token, lastActive] of activeTokens) {
+    if (now - lastActive > timeoutMs) {
+      activeTokens.delete(token);
+    }
   }
 }
 

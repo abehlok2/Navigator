@@ -32,4 +32,13 @@ describe('auth', () => {
     const token = await login('bob', 'wrong');
     expect(token).toBeNull();
   });
+
+  it('revokes tokens', async () => {
+    const { register, login, authenticate, revokeToken } = await import('../auth.ts');
+    await register('carol', 'password');
+    const token = await login('carol', 'password');
+    expect(authenticate(token!)).not.toBeNull();
+    revokeToken(token!);
+    expect(authenticate(token!)).toBeNull();
+  });
 });
