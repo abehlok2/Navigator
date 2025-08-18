@@ -83,3 +83,13 @@
 
 - Build facilitator UI to display asset availability and telemetry metrics.
 - Handle reconnection to resend presence and restart telemetry.
+
+## 2025-08-22
+
+- [x] Integrated connection workflow with basic UI components.
+- [x] Added reconnection logic and telemetry heartbeat handling.
+- [x] Surfaced connection and heartbeat status indicators in the UI.
+
+### Next steps
+
+- Build facilitator UI to display asset availability and telemetry metrics.

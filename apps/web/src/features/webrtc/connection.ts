@@ -3,7 +3,7 @@ import { ControlChannel } from '../control/channel';
 import { useSessionStore } from '../../state/session';
 import { startTelemetry } from '../audio/telemetry';
 
-interface ConnectOptions {
+export interface ConnectOptions {
   roomId: string;
   participantId: string;
   targetId: string;
@@ -138,4 +138,45 @@ export async function connect(
   }
 
   return { pc, dc: dataChannel, control };
+}
+
+export function connectWithReconnection(
+  opts: ConnectOptions & { retryDelayMs?: number }
+): () => void {
+  const session = useSessionStore.getState();
+  let stopped = false;
+  let current: RTCPeerConnection | null = null;
+
+  const attempt = async () => {
+    if (stopped) return;
+    try {
+      const { pc, dc } = await connect(opts);
+      current = pc;
+      dc?.addEventListener('close', () => {
+        if (!stopped) setTimeout(attempt, opts.retryDelayMs ?? 1000);
+      });
+      pc.addEventListener('connectionstatechange', () => {
+        if (
+          pc.connectionState === 'failed' ||
+          pc.connectionState === 'disconnected' ||
+          pc.connectionState === 'closed'
+        ) {
+          session.setConnection('disconnected');
+          if (!stopped) {
+            setTimeout(attempt, opts.retryDelayMs ?? 1000);
+          }
+        }
+      });
+    } catch {
+      session.setConnection('disconnected');
+      if (!stopped) setTimeout(attempt, opts.retryDelayMs ?? 1000);
+    }
+  };
+
+  attempt();
+
+  return () => {
+    stopped = true;
+    current?.close();
+  };
 }
