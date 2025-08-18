@@ -11,6 +11,8 @@ import {
   getRoom,
   attachSocket,
   getParticipant,
+  touchParticipant,
+  cleanupInactiveParticipants,
 } from './rooms.js';
 import { z } from 'zod';
 
@@ -22,6 +24,8 @@ const TURN_CONFIG = {
 
 const app = express();
 app.use(express.json());
+
+const SESSION_TIMEOUT_MS = Number(process.env.SESSION_TIMEOUT_MS ?? 30 * 60 * 1000);
 
 function authMiddleware(requiredRole?: Role) {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -98,6 +102,8 @@ app.post('/rooms/:roomId/role', authMiddleware('facilitator'), (req, res) => {
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
+setInterval(() => cleanupInactiveParticipants(SESSION_TIMEOUT_MS), SESSION_TIMEOUT_MS);
+
 wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
   const params = new URLSearchParams(req.url?.split('?')[1]);
   const token = params.get('token') ?? '';
@@ -117,8 +123,10 @@ wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
   }
 
   attachSocket(roomId, participantId, ws);
+  touchParticipant(roomId, participantId);
 
   ws.on('message', (data: RawData) => {
+    touchParticipant(roomId, participantId);
     try {
       const msg = messageSchema.parse(JSON.parse(data.toString()));
       const target = getParticipant(roomId, msg.target);

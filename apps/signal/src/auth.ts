@@ -2,7 +2,10 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { loadUsers, saveUsers, StoredUser } from './storage.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret';
+const JWT_SECRET = process.env.JWT_SECRET as string;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET not set');
+}
 
 let users: Record<string, StoredUser> = await loadUsers();
 
@@ -28,7 +31,7 @@ export interface AuthPayload {
 
 export function authenticate(token: string): AuthPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as AuthPayload;
+    return jwt.verify(token, JWT_SECRET) as jwt.JwtPayload as AuthPayload;
   } catch {
     return null;
   }
