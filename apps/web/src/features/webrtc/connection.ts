@@ -32,8 +32,8 @@ export async function connect(
   const signalUrl =
     import.meta.env.VITE_SIGNAL_URL ?? 'ws://localhost:8080';
   const ws = new WebSocket(
-    `${signalUrl}?roomId=${opts.roomId}&participantId=${opts.participantId}&token=${opts.token}`
-
+    `${signalUrl}?roomId=${opts.roomId}&participantId=${opts.participantId}`,
+    opts.token
   );
 
   pc.onicecandidate = ev => {
