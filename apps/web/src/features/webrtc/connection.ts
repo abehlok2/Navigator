@@ -1,6 +1,7 @@
 import type { Role } from '../session/api';
 import { ControlChannel } from '../control/channel';
 import { useSessionStore } from '../../state/session';
+import { startTelemetry } from '../audio/telemetry';
 
 interface ConnectOptions {
   roomId: string;
@@ -44,6 +45,25 @@ export async function connect(
 
   pc.ontrack = opts.onTrack;
 
+  let stopTelemetry: (() => void) | undefined;
+
+  function setup(dc: RTCDataChannel, ctrl: ControlChannel) {
+    dc.addEventListener('open', () => {
+      session.setConnection('connected');
+      session.setControl(ctrl);
+      const have = Array.from(useSessionStore.getState().assets);
+      if (have.length) ctrl.send('manifest.presence', { have }, false).catch(() => {});
+      if (opts.role === 'explorer') {
+        stopTelemetry = startTelemetry(ctrl);
+      }
+    });
+    dc.addEventListener('close', () => {
+      stopTelemetry?.();
+      session.setConnection('disconnected');
+      session.setControl(null);
+    });
+  }
+
   if (opts.role === 'facilitator') {
     dataChannel = pc.createDataChannel('control', { ordered: true });
     control = new ControlChannel(dataChannel, {
@@ -52,8 +72,7 @@ export async function connect(
       version: opts.version,
       onError: opts.onControlError,
     });
-    dataChannel.addEventListener('open', () => session.setConnection('connected'));
-    dataChannel.addEventListener('close', () => session.setConnection('disconnected'));
+    setup(dataChannel, control);
     opts.onDataChannel?.(dataChannel);
   } else {
     pc.ondatachannel = ev => {
@@ -64,8 +83,7 @@ export async function connect(
         version: opts.version,
         onError: opts.onControlError,
       });
-      dataChannel!.addEventListener('open', () => session.setConnection('connected'));
-      dataChannel!.addEventListener('close', () => session.setConnection('disconnected'));
+      setup(dataChannel!, control);
       opts.onDataChannel?.(dataChannel!);
     };
   }

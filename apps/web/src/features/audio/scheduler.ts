@@ -45,3 +45,11 @@ export function setGain(id: string, db: number) {
 }
 
 export { crossfade };
+
+export function getPlaying(): string[] {
+  const ids: string[] = [];
+  players.forEach((player, id) => {
+    if (player.isPlaying()) ids.push(id);
+  });
+  return ids;
+}

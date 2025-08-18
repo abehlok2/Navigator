@@ -73,3 +73,13 @@
 
 - Build facilitator UI elements to trigger commands.
 - Sync asset presence and telemetry between peers.
+
+## 2025-08-21
+
+- [x] Synced asset presence between peers via control channel messages.
+- [x] Added periodic telemetry stream reporting RMS, peak and playing tracks.
+
+### Next steps
+
+- Build facilitator UI to display asset availability and telemetry metrics.
+- Handle reconnection to resend presence and restart telemetry.
