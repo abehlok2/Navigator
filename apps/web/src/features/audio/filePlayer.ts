@@ -10,6 +10,7 @@ export class FilePlayer {
   private gainNode: GainNode;
   private source: AudioBufferSourceNode | null = null;
   private offset = 0;
+  private startedAt: number | null = null;
 
   constructor(buffer: AudioBuffer) {
     this.ctx = getAudioContext();
@@ -25,6 +26,7 @@ export class FilePlayer {
     this.source.connect(this.gainNode);
     this.source.start(this.ctx.currentTime + when, offset);
     this.offset = offset;
+    this.startedAt = this.ctx.currentTime + when;
   }
 
   stop(when = 0) {
@@ -32,6 +34,7 @@ export class FilePlayer {
       this.source.stop(this.ctx.currentTime + when);
       this.source.disconnect();
       this.source = null;
+      this.startedAt = null;
     }
   }
 
@@ -53,6 +56,13 @@ export class FilePlayer {
 
   isPlaying() {
     return this.source !== null;
+  }
+
+  getPosition() {
+    if (this.startedAt !== null && this.source) {
+      return this.offset + (this.ctx.currentTime - this.startedAt);
+    }
+    return this.offset;
   }
 }
 

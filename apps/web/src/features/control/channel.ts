@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { Role } from '../session/api';
 import { useSessionStore } from '../../state/session';
+import { playAt, stop as stopPlayback, crossfade, setGain } from '../audio/scheduler';
 import {
   wireMessageSchema,
   payloadSchemaByType,
@@ -10,7 +11,6 @@ import {
   type CmdStop,
   type CmdCrossfade,
   type CmdSetGain,
-  type CmdDucking,
   type Telemetry,
 } from './protocol';
 
@@ -107,6 +107,38 @@ export class ControlChannel {
         const { setTelemetry, setHeartbeat } = useSessionStore.getState();
         setTelemetry(msg.payload as Telemetry);
         setHeartbeat();
+        break;
+      }
+      case 'cmd.play': {
+        this.sendAck(msg.txn, true);
+        const { peerClock } = useSessionStore.getState();
+        const cmd = msg.payload as CmdPlay;
+        if (peerClock) {
+          playAt(cmd.id, peerClock, cmd.atPeerTime, cmd.offset, cmd.gainDb);
+        }
+        break;
+      }
+      case 'cmd.stop': {
+        this.sendAck(msg.txn, true);
+        const cmd = msg.payload as CmdStop;
+        stopPlayback(cmd.id);
+        break;
+      }
+      case 'cmd.crossfade': {
+        this.sendAck(msg.txn, true);
+        const cmd = msg.payload as CmdCrossfade;
+        const { peerClock } = useSessionStore.getState();
+        if (peerClock) {
+          const a = playAt(cmd.fromId, peerClock);
+          const b = playAt(cmd.toId, peerClock);
+          crossfade(a, b, cmd.duration);
+        }
+        break;
+      }
+      case 'cmd.setGain': {
+        this.sendAck(msg.txn, true);
+        const cmd = msg.payload as CmdSetGain;
+        setGain(cmd.id, cmd.gainDb);
         break;
       }
       default: {
