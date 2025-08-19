@@ -5,14 +5,14 @@ export default function AssetAvailability() {
   const assets = useSessionStore(s => Array.from(s.assets));
   if (assets.length === 0) {
     return (
-      <div style={{ marginTop: '1rem' }}>
+      <div className="section">
         <h3>Assets</h3>
         <div>No assets available</div>
       </div>
     );
   }
   return (
-    <div style={{ marginTop: '1rem' }}>
+    <div className="section">
       <h3>Assets</h3>
       <ul>
         {assets.map(id => (

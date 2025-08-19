@@ -24,7 +24,7 @@ export default function App() {
   };
 
   return (
-    <div ref={rootRef}>
+    <div ref={rootRef} className="container">
       <h1>Explorer Sessions</h1>
       <ConnectionStatus />
       <AssetDropZone />

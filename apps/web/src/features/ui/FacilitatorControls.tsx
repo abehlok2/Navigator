@@ -31,7 +31,7 @@ export default function FacilitatorControls() {
   };
 
   return (
-    <div>
+    <div className="section">
       <h2>Facilitator Controls</h2>
       <ul>
         {assets.map(id => (
