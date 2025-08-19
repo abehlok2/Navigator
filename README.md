@@ -62,6 +62,50 @@ Install dependencies:
 pnpm install
 ```
 
+## Hosting and connection setup
+
+Follow these steps to run a complete instance locally and connect a client:
+
+1. **Configure environment variables**
+   
+   Generate a JWT secret and create a `.env` file at the project root. Add any STUN/TURN or timeout settings as needed.
+
+   ```bash
+   echo "JWT_SECRET=$(openssl rand -base64 32)" >> .env
+   ```
+
+2. **Start the STUN/TURN server**
+
+   An example configuration is provided in `ops/`. Launch the server with Docker:
+
+   ```bash
+   cd ops
+   docker compose up turn
+   ```
+
+   Leave this process running and open a new terminal in the project root for the remaining steps.
+
+3. **Run the signal server**
+
+   In the project root, start the WebSocket signal server:
+
+   ```bash
+   pnpm dev:signal
+   ```
+
+4. **Run the web interface**
+
+   In another terminal, start the web client. Set `VITE_SIGNAL_URL` if the signal server is not on `ws://localhost:8080`:
+
+   ```bash
+   pnpm dev:web
+   ```
+
+5. **Connect**
+
+   Open the URL printed by the web interface (typically http://localhost:5173) in a browser. The client will automatically connect to the running signal server.
+
+
 ## Development
 
 ### Web interface
