@@ -134,7 +134,6 @@ app.post('/rooms/:roomId/role', authMiddleware('facilitator'), (req, res) => {
 
 const keyFile = process.env.SSL_KEY_FILE || 'key.pem';
 const certFile = process.env.SSL_CERT_FILE || 'cert.pem';
-const useHttps = existsSync(keyFile) && existsSync(certFile);
 
 const useHttps = existsSync(keyFile) && existsSync(certFile);
 let server;
