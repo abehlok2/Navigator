@@ -15,19 +15,15 @@ services:
       - TURN_PASSWORD=${TURN_PASSWORD:-}
 
   turn:
-    image: coturn/coturn
-    command: ["-c", "/etc/coturn/turnserver.conf", "--user", "${TURN_USERNAME:-user}:${TURN_PASSWORD:-pass}"]
+    image: coturn/coturn:latest
+    container_name: turn
+    restart: unless-stopped
+    command: ["-c", "/etc/turnserver.conf"]
     ports:
-      - "3478:3478"
       - "3478:3478/udp"
-      - "5349:5349"
-      - "5349:5349/udp"
+      - "49160-49200:49160-49200/udp"
     volumes:
-      - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
-    environment:
-      - TURN_EXTERNAL_IP=${TURN_EXTERNAL_IP:-}
-      - TURN_USERNAME=${TURN_USERNAME:-user}
-      - TURN_PASSWORD=${TURN_PASSWORD:-pass}
+      - ./turn/turnserver.conf:/etc/turnserver.conf:ro
 
   caddy:
     image: caddy:2

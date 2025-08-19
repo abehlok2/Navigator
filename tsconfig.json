@@ -1,7 +1,15 @@
 {
   "files": [],
   "references": [
-    { "path": "./apps/web" },
-    { "path": "./apps/signal" }
-  ]
+    {
+      "path": "./apps/web"
+    },
+    {
+      "path": "./apps/signal"
+    }
+  ],
+  "ts-node": {
+    "esm": true,
+    "transpileOnly": true
+  }
 }
