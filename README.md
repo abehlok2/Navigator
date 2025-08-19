@@ -94,6 +94,17 @@ Run the signal server with live reloading:
 pnpm dev:signal
 ```
 
+### STUN/TURN server (coturn)
+
+An example [coturn](https://github.com/coturn/coturn) configuration is provided in `ops/`. To start a local STUN/TURN server for development:
+
+```bash
+cd ops
+docker compose up turn
+```
+
+By default the signal server is configured to use `turn:localhost:3478` for both STUN and TURN. Set the `TURN_USERNAME`, `TURN_PASSWORD` and `TURN_URLS` environment variables if you need different credentials or hosts.
+
 ## Build
 
 ### Web application
