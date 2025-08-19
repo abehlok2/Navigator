@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { handleDrop, type Manifest } from '../audio/assets';
 
 const manifest: Manifest = {
@@ -7,15 +7,21 @@ const manifest: Manifest = {
 };
 
 export default function AssetDropZone() {
+  const [dragging, setDragging] = useState(false);
   const onDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    setDragging(false);
     handleDrop(e.nativeEvent, manifest).catch(err => console.error(err));
   }, []);
   const onDragOver = (e: React.DragEvent<HTMLDivElement>) => e.preventDefault();
+  const onDragEnter = () => setDragging(true);
+  const onDragLeave = () => setDragging(false);
   return (
     <div
       onDrop={onDrop}
       onDragOver={onDragOver}
-      style={{ border: '2px dashed #ccc', padding: '1rem', marginBottom: '1rem' }}
+      onDragEnter={onDragEnter}
+      onDragLeave={onDragLeave}
+      className={`drop-zone${dragging ? ' dragging' : ''}`}
     >
       Drop audio files here (trackA.wav, trackB.wav)
     </div>

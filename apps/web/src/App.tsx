@@ -36,6 +36,10 @@ export default function App() {
   }
 
   return (
+
+    <div ref={rootRef} className="container">
+      <h1>Explorer Sessions</h1>
+
     <div ref={rootRef}>
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
         <h1>Explorer Sessions</h1>
@@ -43,6 +47,7 @@ export default function App() {
           {username} <button onClick={logout}>Logout</button>
         </div>
       </div>
+
       <ConnectionStatus />
       <AssetDropZone />
       <AssetAvailability />
