@@ -13,6 +13,7 @@ export interface Participant {
 export interface Room {
   id: string;
   participants: Map<string, Participant>;
+  password?: string;
 }
 
 const rooms = new Map<string, Room>();
@@ -21,6 +22,7 @@ const storedRooms = await loadRooms();
 for (const room of Object.values(storedRooms)) {
   rooms.set(room.id, {
     id: room.id,
+    password: room.password,
     participants: new Map<string, Participant>(
       room.participants.map(p => [p.id, { id: p.id, role: p.role as Role, lastActive: Date.now() }])
     ),
@@ -32,6 +34,7 @@ function persist() {
   rooms.forEach((room, id) => {
     data[id] = {
       id,
+      password: room.password,
       participants: Array.from(room.participants.values()).map(p => ({ id: p.id, role: p.role })),
     };
   });
@@ -69,6 +72,17 @@ export function removeParticipant(roomId: string, participantId: string): void {
   }
 }
 
+export function kickParticipant(roomId: string, participantId: string): void {
+  const room = rooms.get(roomId);
+  const participant = room?.participants.get(participantId);
+  if (participant?.ws) {
+    participant.ws.close();
+  }
+  if (room?.participants.delete(participantId)) {
+    persist();
+  }
+}
+
 export function setRole(roomId: string, participantId: string, role: Role): void {
   const room = rooms.get(roomId);
   const participant = room?.participants.get(participantId);
@@ -76,6 +90,20 @@ export function setRole(roomId: string, participantId: string, role: Role): void
     participant.role = role;
     persist();
   }
+}
+
+export function setPassword(roomId: string, password?: string): void {
+  const room = rooms.get(roomId);
+  if (room) {
+    room.password = password;
+    persist();
+  }
+}
+
+export function verifyPassword(roomId: string, password?: string): boolean {
+  const room = rooms.get(roomId);
+  if (!room?.password) return !password;
+  return room.password === password;
 }
 
 export function attachSocket(roomId: string, participantId: string, ws?: WebSocket): void {

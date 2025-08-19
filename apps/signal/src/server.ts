@@ -16,6 +16,9 @@ import {
   getParticipant,
   touchParticipant,
   cleanupInactiveParticipants,
+  setPassword,
+  verifyPassword,
+  kickParticipant,
 } from './rooms.js';
 import { z } from 'zod';
 
@@ -100,13 +103,17 @@ app.post('/rooms', authMiddleware('facilitator'), (_req, res) => {
   res.json({ roomId: room.id });
 });
 
-const joinBody = z.object({ role: roleSchema });
+const joinBody = z.object({ role: roleSchema, password: z.string().optional() });
 app.post('/rooms/:roomId/join', authMiddleware(), (req, res) => {
   try {
-    const { role } = joinBody.parse(req.body);
+    const { role, password } = joinBody.parse(req.body);
     const user = (req as any).user as AuthPayload;
     if (role !== user.role) {
       res.status(403).json({ error: 'role mismatch' });
+      return;
+    }
+    if (!verifyPassword(req.params.roomId, password)) {
+      res.status(403).json({ error: 'invalid password' });
       return;
     }
     const participant = addParticipant(req.params.roomId, role);
@@ -130,6 +137,18 @@ app.post('/rooms/:roomId/role', authMiddleware('facilitator'), (req, res) => {
   } catch {
     res.status(400).json({ error: 'invalid role' });
   }
+});
+
+app.post('/rooms/:roomId/password', authMiddleware('facilitator'), (req, res) => {
+  const { password } = req.body as { password?: string };
+  setPassword(req.params.roomId, password);
+  res.sendStatus(204);
+});
+
+app.post('/rooms/:roomId/kick', authMiddleware('facilitator'), (req, res) => {
+  const { participantId } = req.body as { participantId: string };
+  kickParticipant(req.params.roomId, participantId);
+  res.sendStatus(204);
 });
 
 const keyFile = process.env.SSL_KEY_FILE || 'key.pem';
