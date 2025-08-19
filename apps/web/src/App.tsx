@@ -8,6 +8,7 @@ import TelemetryDisplay from './features/ui/TelemetryDisplay';
 import { useAudioContextUnlock } from './features/audio/context';
 import AuthForm from './features/auth/AuthForm';
 import { useAuthStore } from './state/auth';
+import { Button } from './components/ui/button';
 
 export default function App() {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -36,15 +37,11 @@ export default function App() {
   }
 
   return (
-
     <div ref={rootRef} className="container">
-      <h1>Explorer Sessions</h1>
-
-    <div ref={rootRef}>
-      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+      <div className="mb-4 flex justify-between">
         <h1>Explorer Sessions</h1>
-        <div>
-          {username} <button onClick={logout}>Logout</button>
+        <div className="flex items-center gap-2">
+          {username} <Button onClick={logout}>Logout</Button>
         </div>
       </div>
 
@@ -53,7 +50,7 @@ export default function App() {
       <AssetAvailability />
       <FacilitatorControls />
       <TelemetryDisplay />
-      <button onClick={handleConnect}>Connect</button>
+      <Button onClick={handleConnect} className="mt-4">Connect</Button>
     </div>
   );
 }
