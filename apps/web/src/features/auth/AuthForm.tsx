@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '../../state/auth';
+import { Button } from '../../components/ui/button';
 
 export default function AuthForm() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -38,42 +39,48 @@ export default function AuthForm() {
   };
 
   return (
-    <div>
-      <h2>{mode === 'login' ? 'Login' : 'Create Account'}</h2>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <input
-            type="text"
-            placeholder="Username"
-            value={username}
-            onChange={e => setUsername(e.target.value)}
-          />
-        </div>
-        <div>
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-          />
-        </div>
+    <div className="mx-auto max-w-sm p-4">
+      <h2 className="mb-4 text-xl font-semibold">
+        {mode === 'login' ? 'Login' : 'Create Account'}
+      </h2>
+      <form onSubmit={handleSubmit} className="space-y-2">
+        <input
+          type="text"
+          placeholder="Username"
+          value={username}
+          onChange={e => setUsername(e.target.value)}
+          className="w-full rounded border border-gray-300 p-2"
+        />
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          className="w-full rounded border border-gray-300 p-2"
+        />
         {mode === 'register' && (
-          <div>
-            <select value={role} onChange={e => setRole(e.target.value)}>
-              <option value="explorer">Explorer</option>
-              <option value="facilitator">Facilitator</option>
-              <option value="listener">Listener</option>
-            </select>
-          </div>
+          <select
+            value={role}
+            onChange={e => setRole(e.target.value)}
+            className="w-full rounded border border-gray-300 p-2"
+          >
+            <option value="explorer">Explorer</option>
+            <option value="facilitator">Facilitator</option>
+            <option value="listener">Listener</option>
+          </select>
         )}
-        {error && <div style={{ color: 'red' }}>{error}</div>}
-        <button type="submit">
+        {error && <div className="text-red-500">{error}</div>}
+        <Button type="submit" className="w-full">
           {mode === 'login' ? 'Login' : 'Register'}
-        </button>
+        </Button>
       </form>
-      <button onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
+      <Button
+        type="button"
+        onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
+        className="mt-2 w-full bg-transparent text-blue-600 hover:bg-blue-50"
+      >
         {mode === 'login' ? 'Need an account? Register' : 'Have an account? Login'}
-      </button>
+      </Button>
     </div>
   );
 }
