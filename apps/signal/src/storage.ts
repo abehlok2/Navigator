@@ -10,6 +10,7 @@ interface StoredParticipant {
 
 export interface StoredRoom {
   id: string;
+  password?: string;
   participants: StoredParticipant[];
 }
 

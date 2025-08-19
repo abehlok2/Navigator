@@ -32,4 +32,23 @@ describe('rooms', () => {
     cleanupInactiveParticipants(30 * 60 * 1000); // 30 minutes
     expect(listParticipants(room.id)).toHaveLength(0);
   });
+
+  it('sets and verifies password', async () => {
+    const { createRoom, setPassword, verifyPassword } = await import('../rooms.ts');
+    const room = createRoom('room1');
+    setPassword(room.id, 'secret');
+    expect(verifyPassword(room.id, 'secret')).toBe(true);
+    expect(verifyPassword(room.id, 'wrong')).toBe(false);
+  });
+
+  it('kicks participant and closes socket', async () => {
+    const { createRoom, addParticipant, attachSocket, kickParticipant, getParticipant } = await import('../rooms.ts');
+    const room = createRoom('room1');
+    const participant = addParticipant(room.id, 'explorer');
+    const ws = { close: vi.fn() } as any;
+    attachSocket(room.id, participant.id, ws);
+    kickParticipant(room.id, participant.id);
+    expect(getParticipant(room.id, participant.id)).toBeUndefined();
+    expect(ws.close).toHaveBeenCalled();
+  });
 });
