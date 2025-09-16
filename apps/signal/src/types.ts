@@ -89,6 +89,7 @@ export const cmdCrossfadeMessage = controlEnvelope.extend({
     fromId: z.string(),
     toId: z.string(),
     duration: z.number(),
+    toOffset: z.number().optional(),
   }),
 });
 

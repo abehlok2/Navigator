@@ -42,6 +42,7 @@ export const cmdCrossfadeSchema = z.object({
   fromId: z.string(),
   toId: z.string(),
   duration: z.number(),
+  toOffset: z.number().optional(),
 });
 export type CmdCrossfade = z.infer<typeof cmdCrossfadeSchema>;
 
