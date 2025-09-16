@@ -59,8 +59,13 @@ export async function connect(
     dc.addEventListener('open', () => {
       session.setConnection('connected');
       session.setControl(ctrl);
-      const have = Array.from(useSessionStore.getState().assets);
-      if (have.length) ctrl.send('asset.presence', { have, missing: [] }, false).catch(() => {});
+      const store = useSessionStore.getState();
+      const manifestIds = Object.keys(store.manifest);
+      if (manifestIds.length) {
+        const have = manifestIds.filter(id => store.assets.has(id));
+        const missing = manifestIds.filter(id => !store.assets.has(id));
+        ctrl.send('asset.presence', { have, missing }, false).catch(() => {});
+      }
       ctrl.setMicStream(localMicStream);
       if (opts.role === 'explorer') {
         peerClock = new PeerClock(ctrl);
@@ -77,6 +82,7 @@ export async function connect(
       session.setControl(null);
       session.setTelemetry(null);
       ctrl.setMicStream(null);
+      session.setMicStream(null);
     });
   }
 
@@ -115,6 +121,7 @@ export async function connect(
       video: false,
     });
     localMicStream = stream;
+    session.setMicStream(stream);
     control?.setMicStream(stream);
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
   }

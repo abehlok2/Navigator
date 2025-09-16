@@ -4,10 +4,12 @@ import { connectWithReconnection } from './features/webrtc/connection';
 import AssetDropZone from './features/ui/AssetDropZone';
 import AssetAvailability from './features/ui/AssetAvailability';
 import FacilitatorControls from './features/ui/FacilitatorControls';
+import RecordingControls from './features/ui/RecordingControls';
 import TelemetryDisplay from './features/ui/TelemetryDisplay';
 import { useAudioContextUnlock } from './features/audio/context';
 import AuthForm from './features/auth/AuthForm';
 import { useAuthStore } from './state/auth';
+import { useSessionStore } from './state/session';
 import { Button } from './components/ui/button';
 import { createRoom, joinRoom, type Role } from './features/session/api';
 
@@ -32,6 +34,7 @@ export default function App() {
   const [connecting, setConnecting] = useState(false);
   const [creatingRoom, setCreatingRoom] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const sessionRole = useSessionStore(state => state.role);
 
   const cleanupRemoteAudio = useCallback(() => {
     remoteAudioElements.current.forEach(audio => {
@@ -158,7 +161,7 @@ export default function App() {
       <ConnectionStatus />
       <AssetDropZone />
       <AssetAvailability />
-      <FacilitatorControls />
+      {sessionRole === 'facilitator' ? <FacilitatorControls /> : <RecordingControls />}
       <TelemetryDisplay />
       <div className="mt-4 flex flex-col gap-2">
         <div className="flex gap-2">
