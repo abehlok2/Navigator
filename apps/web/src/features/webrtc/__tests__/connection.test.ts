@@ -1,12 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-declare global {
-  // eslint-disable-next-line no-var
-  var navigator: any;
-}
-
 class FakeRTCDataChannel {
-  public send = vi.fn<(data: string) => void>();
+  public send = vi.fn<[string], void>();
   private listeners = new Map<string, Array<(...args: any[]) => void>>();
 
   addEventListener(event: string, handler: (...args: any[]) => void) {
@@ -149,7 +144,7 @@ describe('connectWithReconnection', () => {
     const getUserMedia = vi.fn().mockResolvedValue({
       getTracks: () => [{ stop: vi.fn() }],
     });
-    global.navigator = { mediaDevices: { getUserMedia } };
+    (globalThis as any).navigator = { mediaDevices: { getUserMedia } };
 
     const { connectWithReconnection } = await import('../connection');
 
