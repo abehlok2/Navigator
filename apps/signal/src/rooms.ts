@@ -18,6 +18,30 @@ export interface Room {
 
 const rooms = new Map<string, Room>();
 
+function roleLimit(role: Role): number {
+  switch (role) {
+    case 'listener':
+      return 5;
+    case 'facilitator':
+    case 'explorer':
+    default:
+      return 1;
+  }
+}
+
+function ensureRoleCapacity(room: Room, role: Role, excludeId?: string): void {
+  const limit = roleLimit(role);
+  const count = Array.from(room.participants.values()).filter(
+    participant => participant.role === role && participant.id !== excludeId
+  ).length;
+  if (count >= limit) {
+    if (role === 'listener') {
+      throw new Error('listener limit reached');
+    }
+    throw new Error(`${role} already present`);
+  }
+}
+
 const storedRooms = await loadRooms();
 for (const room of Object.values(storedRooms)) {
   rooms.set(room.id, {
@@ -55,10 +79,7 @@ export function getRoom(id: string): Room | undefined {
 export function addParticipant(roomId: string, role: Role): Participant {
   const room = rooms.get(roomId);
   if (!room) throw new Error('room not found');
-  if (role === 'listener') {
-    const listeners = Array.from(room.participants.values()).filter(p => p.role === 'listener').length;
-    if (listeners >= 5) throw new Error('listener limit reached');
-  }
+  ensureRoleCapacity(room, role);
   const participant: Participant = { id: randomUUID(), role, lastActive: Date.now() };
   room.participants.set(participant.id, participant);
   persist();
@@ -86,7 +107,8 @@ export function kickParticipant(roomId: string, participantId: string): void {
 export function setRole(roomId: string, participantId: string, role: Role): void {
   const room = rooms.get(roomId);
   const participant = room?.participants.get(participantId);
-  if (participant) {
+  if (participant && room) {
+    ensureRoleCapacity(room, role, participantId);
     participant.role = role;
     persist();
   }
