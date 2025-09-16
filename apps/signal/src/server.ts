@@ -5,7 +5,7 @@ import { readFileSync, existsSync } from 'fs';
 import { WebSocketServer, type WebSocket, type RawData } from 'ws';
 import rateLimit from 'express-rate-limit';
 import { authenticate, login, register, revokeToken, cleanupExpiredTokens, type AuthPayload } from './auth.js';
-import { messageSchema, roleSchema, type Role } from './types.js';
+import { messageSchema, roleSchema, type Role, type WireMessage } from './types.js';
 import {
   createRoom,
   addParticipant,
@@ -201,15 +201,27 @@ wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
       // listeners are read-only
       return;
     }
+
+    let msg: WireMessage;
     try {
-      const msg = messageSchema.parse(JSON.parse(data.toString()));
-      const target = getParticipant(roomId, msg.target);
-      if (target?.ws) {
-        target.ws.send(JSON.stringify({ ...msg, from: participantId }));
-      }
+      msg = messageSchema.parse(JSON.parse(data.toString()));
     } catch {
       ws.send(JSON.stringify({ type: 'error', error: 'invalid message' }));
+      return;
     }
+
+    if (msg.roomId !== roomId) {
+      ws.send(JSON.stringify({ type: 'error', error: 'invalid room' }));
+      return;
+    }
+
+    const target = getParticipant(roomId, msg.target);
+    if (!target?.ws) {
+      ws.send(JSON.stringify({ type: 'error', error: 'target not available' }));
+      return;
+    }
+
+    target.ws.send(JSON.stringify({ ...msg, from: participantId }));
   });
 
   ws.on('close', () => {
