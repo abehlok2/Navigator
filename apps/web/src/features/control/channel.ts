@@ -1,14 +1,26 @@
 import { z } from 'zod';
 import type { Role } from '../session/api';
 import { useSessionStore } from '../../state/session';
-import { playAt, stop as stopPlayback, crossfade, setGain } from '../audio/scheduler';
+import {
+  playAt,
+  stop as stopPlayback,
+  crossfade,
+  setGain,
+  seek as seekTo,
+  unload as unloadPlayer,
+  invalidate as invalidatePlayer,
+} from '../audio/scheduler';
 import { getMasterGain } from '../audio/context';
 import { cleanupSpeechDucking, setupSpeechDucking } from '../audio/ducking';
+import { loadRemoteAsset, hasBuffer, removeBuffer } from '../audio/assets';
 import {
   wireMessageSchema,
   payloadSchemaByType,
   type WireMessage,
   type Ack,
+  type CmdLoad,
+  type CmdUnload,
+  type CmdSeek,
   type CmdPlay,
   type CmdStop,
   type CmdCrossfade,
@@ -158,6 +170,12 @@ export class ControlChannel {
         stopPlayback(cmd.id);
         break;
       }
+      case 'cmd.seek': {
+        this.sendAck(msg.txn, true);
+        const cmd = msg.payload as CmdSeek;
+        seekTo(cmd.id, cmd.offset);
+        break;
+      }
       case 'cmd.crossfade': {
         this.sendAck(msg.txn, true);
         const cmd = msg.payload as CmdCrossfade;
@@ -167,6 +185,16 @@ export class ControlChannel {
           const b = playAt(cmd.toId, peerClock);
           crossfade(a, b, cmd.duration);
         }
+        break;
+      }
+      case 'cmd.load': {
+        const cmd = msg.payload as CmdLoad;
+        void this.handleLoadCommand(msg.txn, cmd);
+        break;
+      }
+      case 'cmd.unload': {
+        const cmd = msg.payload as CmdUnload;
+        this.handleUnloadCommand(msg.txn, cmd);
         break;
       }
       case 'cmd.setGain': {
@@ -257,6 +285,10 @@ export class ControlChannel {
     return this.send('cmd.stop', cmd);
   }
 
+  seek(cmd: CmdSeek) {
+    return this.send('cmd.seek', cmd);
+  }
+
   crossfade(cmd: CmdCrossfade) {
     return this.send('cmd.crossfade', cmd);
   }
@@ -267,5 +299,69 @@ export class ControlChannel {
 
   ducking(cmd: CmdDucking) {
     return this.send('cmd.ducking', cmd);
+  }
+
+  load(cmd: CmdLoad) {
+    return this.send('cmd.load', cmd);
+  }
+
+  unload(cmd: CmdUnload) {
+    return this.send('cmd.unload', cmd);
+  }
+
+  private async handleLoadCommand(txn: string | undefined, cmd: CmdLoad) {
+    const state = useSessionStore.getState();
+    const previousProgress = state.assetProgress[cmd.id]
+      ? { ...state.assetProgress[cmd.id] }
+      : undefined;
+    const hadAsset = state.assets.has(cmd.id);
+    const baseTotal = cmd.bytes ?? state.manifest[cmd.id]?.bytes ?? previousProgress?.total ?? 0;
+    const optimisticLoaded = baseTotal > 0 ? Math.min(baseTotal, Math.max(1, baseTotal * 0.01)) : 1;
+    const optimisticTotal = baseTotal > 0 ? baseTotal : 1;
+    state.setAssetProgress(cmd.id, optimisticLoaded, optimisticTotal);
+
+    if (!cmd.source) {
+      if (hasBuffer(cmd.id) || hadAsset) {
+        const previousTotal = previousProgress?.total ?? baseTotal;
+        const normalisedTotal = previousTotal > 0 ? previousTotal : 1;
+        state.setAssetProgress(cmd.id, previousProgress?.loaded ?? baseTotal, normalisedTotal);
+        this.sendAck(txn, true);
+        return;
+      }
+      const error = 'no source provided for load command';
+      state.setAssetProgress(cmd.id, 0, optimisticTotal);
+      this.sendAck(txn, false, error);
+      this.opts.onError?.(error);
+      return;
+    }
+
+    try {
+      const result = await loadRemoteAsset({ id: cmd.id, source: cmd.source, sha256: cmd.sha256 });
+      const rawTotal = cmd.bytes ?? result.bytes ?? baseTotal;
+      const finalTotal = rawTotal > 0 ? rawTotal : 1;
+      state.setAssetProgress(cmd.id, finalTotal, finalTotal);
+      invalidatePlayer(cmd.id);
+      state.addAsset(cmd.id, { broadcast: true });
+      this.sendAck(txn, true);
+    } catch (err) {
+      if (previousProgress) {
+        state.setAssetProgress(cmd.id, previousProgress.loaded, previousProgress.total);
+      } else {
+        state.setAssetProgress(cmd.id, 0, optimisticTotal);
+        state.removeAsset(cmd.id, { broadcast: false });
+        removeBuffer(cmd.id);
+      }
+      const message = (err as Error).message ?? 'failed to load asset';
+      this.sendAck(txn, false, message);
+      this.opts.onError?.(message);
+    }
+  }
+
+  private handleUnloadCommand(txn: string | undefined, cmd: CmdUnload) {
+    const state = useSessionStore.getState();
+    unloadPlayer(cmd.id);
+    removeBuffer(cmd.id);
+    state.removeAsset(cmd.id, { broadcast: true });
+    this.sendAck(txn, true);
   }
 }

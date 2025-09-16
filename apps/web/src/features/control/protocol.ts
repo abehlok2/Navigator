@@ -45,6 +45,25 @@ export const cmdCrossfadeSchema = z.object({
 });
 export type CmdCrossfade = z.infer<typeof cmdCrossfadeSchema>;
 
+export const cmdLoadSchema = z.object({
+  id: z.string(),
+  sha256: z.string().optional(),
+  bytes: z.number().optional(),
+  source: z.string().optional(),
+});
+export type CmdLoad = z.infer<typeof cmdLoadSchema>;
+
+export const cmdUnloadSchema = z.object({
+  id: z.string(),
+});
+export type CmdUnload = z.infer<typeof cmdUnloadSchema>;
+
+export const cmdSeekSchema = z.object({
+  id: z.string(),
+  offset: z.number(),
+});
+export type CmdSeek = z.infer<typeof cmdSeekSchema>;
+
 export const cmdSetGainSchema = z.object({
   id: z.string(),
   gainDb: z.number(),
@@ -88,8 +107,11 @@ export const payloadSchemaByType = {
   ack: ackSchema,
   'clock.ping': clockPingSchema,
   'clock.pong': clockPongSchema,
+  'cmd.load': cmdLoadSchema,
+  'cmd.unload': cmdUnloadSchema,
   'cmd.play': cmdPlaySchema,
   'cmd.stop': cmdStopSchema,
+  'cmd.seek': cmdSeekSchema,
   'cmd.crossfade': cmdCrossfadeSchema,
   'cmd.setGain': cmdSetGainSchema,
   'cmd.ducking': cmdDuckingSchema,

@@ -28,13 +28,18 @@ describe('ControlChannel message handling', () => {
 
   it('acknowledges telemetry updates and stores levels', async () => {
     vi.doMock('../../audio/scheduler', () => ({
+      __esModule: true,
       playAt: vi.fn(),
       stop: vi.fn(),
       crossfade: vi.fn(),
       setGain: vi.fn(),
+      seek: vi.fn(),
+      unload: vi.fn(),
+      invalidate: vi.fn(),
     }));
-    vi.doMock('../../audio/context', () => ({ getMasterGain: vi.fn(() => ({})) }));
+    vi.doMock('../../audio/context', () => ({ __esModule: true, getMasterGain: vi.fn(() => ({})) }));
     vi.doMock('../../audio/ducking', () => ({
+      __esModule: true,
       setupSpeechDucking: vi.fn(),
       cleanupSpeechDucking: vi.fn(),
     }));
@@ -81,23 +86,29 @@ describe('ControlChannel message handling', () => {
     };
 
     vi.doMock('../../state/session', () => ({
+      __esModule: true,
       useSessionStore: {
         getState: () => storeState,
       },
     }));
 
     vi.doMock('../../audio/scheduler', () => ({
+      __esModule: true,
       playAt: vi.fn(),
       stop: vi.fn(),
       crossfade: vi.fn(),
       setGain: vi.fn(),
+      seek: vi.fn(),
+      unload: vi.fn(),
+      invalidate: vi.fn(),
     }));
 
     const setupSpeechDucking = vi.fn();
     const cleanupSpeechDucking = vi.fn();
 
-    vi.doMock('../../audio/context', () => ({ getMasterGain: vi.fn(() => 'master-gain') }));
+    vi.doMock('../../audio/context', () => ({ __esModule: true, getMasterGain: vi.fn(() => 'master-gain') }));
     vi.doMock('../../audio/ducking', () => ({
+      __esModule: true,
       setupSpeechDucking,
       cleanupSpeechDucking,
     }));
@@ -161,5 +172,263 @@ describe('ControlChannel message handling', () => {
 
     expect(cleanupSpeechDucking).toHaveBeenCalled();
     expect(dc.send).toHaveBeenCalled();
+  });
+
+  it('loads assets on cmd.load and acknowledges success', async () => {
+    const invalidate = vi.fn();
+    const unload = vi.fn();
+    const seek = vi.fn();
+    const loadRemoteAsset = vi.fn(async () => ({ bytes: 2048 }));
+    const removeBuffer = vi.fn();
+    const hasBuffer = vi.fn(() => false);
+
+    vi.doMock('../../audio/scheduler', () => ({
+      __esModule: true,
+      playAt: vi.fn(),
+      stop: vi.fn(),
+      crossfade: vi.fn(),
+      setGain: vi.fn(),
+      seek,
+      unload,
+      invalidate,
+    }));
+    vi.doMock('../../audio/assets', () => ({
+      __esModule: true,
+      loadRemoteAsset,
+      hasBuffer,
+      removeBuffer,
+    }));
+    vi.doMock('../../audio/context', () => ({ __esModule: true, getMasterGain: vi.fn(() => ({})) }));
+    vi.doMock('../../audio/ducking', () => ({
+      __esModule: true,
+      setupSpeechDucking: vi.fn(),
+      cleanupSpeechDucking: vi.fn(),
+    }));
+
+    const { useSessionStore } = await import('../../../state/session');
+    useSessionStore.setState({
+      manifest: { tone: { id: 'tone', sha256: 'abc', bytes: 1024 } },
+      assets: new Set(),
+      assetProgress: {},
+    });
+    const state = useSessionStore.getState();
+    const setAssetProgressSpy = vi.spyOn(state, 'setAssetProgress');
+
+    const { ControlChannel } = await import('../channel');
+
+    const dc = new FakeDataChannel();
+    const errors: string[] = [];
+    new ControlChannel(dc as unknown as RTCDataChannel, {
+      role: 'explorer',
+      roomId: 'room',
+      version: 'v1',
+      onError: err => errors.push(err),
+    });
+
+    dc.emit('message', {
+      data: JSON.stringify({
+        type: 'cmd.load',
+        txn: 'txn-load',
+        payload: { id: 'tone', source: 'https://cdn.example/tone.wav', bytes: 1024 },
+      }),
+    });
+
+    await Promise.resolve();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(loadRemoteAsset).toHaveBeenCalledWith({ id: 'tone', source: 'https://cdn.example/tone.wav', sha256: undefined });
+    expect(errors).toHaveLength(0);
+    const ack = JSON.parse(dc.send.mock.calls.at(-1)?.[0] as string);
+    expect(ack.payload).toEqual({ ok: true, forTxn: 'txn-load' });
+    const firstProgress = setAssetProgressSpy.mock.calls[0];
+    const finalProgress = setAssetProgressSpy.mock.calls.at(-1);
+    expect(firstProgress).toBeDefined();
+    expect(finalProgress).toBeDefined();
+    expect(firstProgress?.[1]).toBeGreaterThan(0);
+    expect(finalProgress?.[1]).toBeGreaterThanOrEqual(finalProgress?.[2] ?? 0);
+    const finalState = useSessionStore.getState();
+    expect(finalState.assets.has('tone')).toBe(true);
+    expect(finalState.assetProgress.tone?.loaded).toBeGreaterThan(0);
+  });
+
+  it('reports errors when cmd.load fails', async () => {
+    const invalidate = vi.fn();
+    const unload = vi.fn();
+    const seek = vi.fn();
+    const loadRemoteAsset = vi.fn(async () => {
+      throw new Error('fetch failed');
+    });
+    const removeBuffer = vi.fn();
+    const hasBuffer = vi.fn(() => false);
+
+    vi.doMock('../../audio/scheduler', () => ({
+      __esModule: true,
+      playAt: vi.fn(),
+      stop: vi.fn(),
+      crossfade: vi.fn(),
+      setGain: vi.fn(),
+      seek,
+      unload,
+      invalidate,
+    }));
+    vi.doMock('../../audio/assets', () => ({
+      __esModule: true,
+      loadRemoteAsset,
+      hasBuffer,
+      removeBuffer,
+    }));
+    vi.doMock('../../audio/context', () => ({ __esModule: true, getMasterGain: vi.fn(() => ({})) }));
+    vi.doMock('../../audio/ducking', () => ({
+      __esModule: true,
+      setupSpeechDucking: vi.fn(),
+      cleanupSpeechDucking: vi.fn(),
+    }));
+
+    const { useSessionStore } = await import('../../../state/session');
+    useSessionStore.setState({
+      manifest: { tone: { id: 'tone', sha256: 'abc', bytes: 1024 } },
+      assets: new Set(),
+      assetProgress: {},
+    });
+    const state = useSessionStore.getState();
+    const setAssetProgressSpy = vi.spyOn(state, 'setAssetProgress');
+
+    const { ControlChannel } = await import('../channel');
+
+    const dc = new FakeDataChannel();
+    const errors: string[] = [];
+    new ControlChannel(dc as unknown as RTCDataChannel, {
+      role: 'explorer',
+      roomId: 'room',
+      version: 'v1',
+      onError: err => errors.push(err),
+    });
+
+    dc.emit('message', {
+      data: JSON.stringify({
+        type: 'cmd.load',
+        txn: 'txn-load',
+        payload: { id: 'tone', source: 'https://cdn.example/tone.wav', bytes: 1024 },
+      }),
+    });
+
+    await Promise.resolve();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(loadRemoteAsset).toHaveBeenCalled();
+    expect(errors).toContain('fetch failed');
+    const ack = JSON.parse(dc.send.mock.calls.at(-1)?.[0] as string);
+    expect(ack.payload).toEqual({ ok: false, forTxn: 'txn-load', error: 'fetch failed' });
+    const finalProgress = setAssetProgressSpy.mock.calls.at(-1);
+    expect(finalProgress?.[1]).toBe(0);
+    const finalState = useSessionStore.getState();
+    expect(finalState.assets.has('tone')).toBe(false);
+    expect(finalState.assetProgress.tone?.loaded ?? 0).toBe(0);
+  });
+
+  it('handles cmd.unload by removing local assets', async () => {
+    const invalidate = vi.fn();
+    const unload = vi.fn();
+    const seek = vi.fn();
+    const loadRemoteAsset = vi.fn();
+    const removeBuffer = vi.fn();
+    const hasBuffer = vi.fn(() => true);
+
+    vi.doMock('../../audio/scheduler', () => ({
+      __esModule: true,
+      playAt: vi.fn(),
+      stop: vi.fn(),
+      crossfade: vi.fn(),
+      setGain: vi.fn(),
+      seek,
+      unload,
+      invalidate,
+    }));
+    vi.doMock('../../audio/assets', () => ({
+      __esModule: true,
+      loadRemoteAsset,
+      hasBuffer,
+      removeBuffer,
+    }));
+    vi.doMock('../../audio/context', () => ({ __esModule: true, getMasterGain: vi.fn(() => ({})) }));
+    vi.doMock('../../audio/ducking', () => ({
+      __esModule: true,
+      setupSpeechDucking: vi.fn(),
+      cleanupSpeechDucking: vi.fn(),
+    }));
+
+    const { useSessionStore } = await import('../../../state/session');
+    useSessionStore.setState({
+      manifest: { tone: { id: 'tone', sha256: 'abc', bytes: 1024 } },
+      assets: new Set(['tone']),
+      assetProgress: { tone: { loaded: 1024, total: 1024 } },
+    });
+    const state = useSessionStore.getState();
+    const removeAssetSpy = vi.spyOn(state, 'removeAsset');
+
+    const { ControlChannel } = await import('../channel');
+
+    const dc = new FakeDataChannel();
+    new ControlChannel(dc as unknown as RTCDataChannel, {
+      role: 'explorer',
+      roomId: 'room',
+      version: 'v1',
+      onError: vi.fn(),
+    });
+
+    dc.emit('message', {
+      data: JSON.stringify({ type: 'cmd.unload', txn: 'txn-unload', payload: { id: 'tone' } }),
+    });
+
+    expect(unload).toHaveBeenCalledWith('tone');
+    expect(removeBuffer).toHaveBeenCalledWith('tone');
+    expect(removeAssetSpy).toHaveBeenCalledWith('tone', { broadcast: true });
+    const ack = JSON.parse(dc.send.mock.calls.at(-1)?.[0] as string);
+    expect(ack.payload).toEqual({ ok: true, forTxn: 'txn-unload' });
+  });
+
+  it('seeks playback when cmd.seek is received', async () => {
+    const seek = vi.fn();
+
+    vi.doMock('../../audio/scheduler', () => ({
+      __esModule: true,
+      playAt: vi.fn(),
+      stop: vi.fn(),
+      crossfade: vi.fn(),
+      setGain: vi.fn(),
+      seek,
+      unload: vi.fn(),
+      invalidate: vi.fn(),
+    }));
+    vi.doMock('../../audio/assets', () => ({
+      __esModule: true,
+      loadRemoteAsset: vi.fn(),
+      hasBuffer: vi.fn(() => true),
+      removeBuffer: vi.fn(),
+    }));
+    vi.doMock('../../audio/context', () => ({ __esModule: true, getMasterGain: vi.fn(() => ({})) }));
+    vi.doMock('../../audio/ducking', () => ({
+      __esModule: true,
+      setupSpeechDucking: vi.fn(),
+      cleanupSpeechDucking: vi.fn(),
+    }));
+
+    const { ControlChannel } = await import('../channel');
+
+    const dc = new FakeDataChannel();
+    new ControlChannel(dc as unknown as RTCDataChannel, {
+      role: 'explorer',
+      roomId: 'room',
+      version: 'v1',
+      onError: vi.fn(),
+    });
+
+    dc.emit('message', {
+      data: JSON.stringify({ type: 'cmd.seek', txn: 'txn-seek', payload: { id: 'tone', offset: 1.5 } }),
+    });
+
+    expect(seek).toHaveBeenCalledWith('tone', 1.5);
+    const ack = JSON.parse(dc.send.mock.calls.at(-1)?.[0] as string);
+    expect(ack.payload).toEqual({ ok: true, forTxn: 'txn-seek' });
   });
 });

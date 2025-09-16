@@ -33,6 +33,7 @@ interface SessionState {
   setManifest: (entries: AssetManifest['entries']) => void;
   setAssetProgress: (id: string, loaded: number, total?: number) => void;
   addAsset: (id: string, opts?: { broadcast?: boolean }) => void;
+  removeAsset: (id: string, opts?: { broadcast?: boolean }) => void;
   updateRemotePresence: (presence: AssetPresence) => void;
   setTelemetry: (t: TelemetryLevels | null) => void;
   setHeartbeat: () => void;
@@ -106,6 +107,26 @@ export const useSessionStore = create<SessionState>(set => ({
       const entry = state.manifest[id];
       if (entry) {
         assetProgress[id] = { loaded: entry.bytes, total: entry.bytes };
+      }
+      const shouldBroadcast = opts?.broadcast ?? true;
+      if (shouldBroadcast) {
+        const presence = computePresence(state.manifest, assets);
+        if (presence && state.control) {
+          state.control.send('asset.presence', presence, false).catch(() => {});
+        }
+      }
+      return { assets, assetProgress };
+    }),
+  removeAsset: (id, opts) =>
+    set(state => {
+      const assets = new Set(state.assets);
+      assets.delete(id);
+      const assetProgress = { ...state.assetProgress };
+      const entry = state.manifest[id];
+      if (entry) {
+        assetProgress[id] = { loaded: 0, total: entry.bytes };
+      } else {
+        delete assetProgress[id];
       }
       const shouldBroadcast = opts?.broadcast ?? true;
       if (shouldBroadcast) {

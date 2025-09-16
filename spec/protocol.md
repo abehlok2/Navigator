@@ -66,6 +66,15 @@ All commands flow from Facilitator to Explorer and use the envelope `type`
 prefix `cmd.*`.
 
 ```ts
+interface CmdLoad {
+  id: string;
+  sha256?: string;
+  bytes?: number;
+  source?: string; // URL or data URI to fetch/decode
+}
+
+interface CmdUnload { id: string; }
+
 interface CmdPlay {
   id: string;
   atPeerTime?: number; // facilitator clock estimate
@@ -74,6 +83,8 @@ interface CmdPlay {
 }
 
 interface CmdStop { id: string; }
+
+interface CmdSeek { id: string; offset: number; }
 
 interface CmdCrossfade {
   fromId: string;
