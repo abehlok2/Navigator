@@ -53,18 +53,20 @@ export async function connect(
 
   let stopTelemetry: (() => void) | undefined;
   let peerClock: PeerClock | undefined;
+  let localMicStream: MediaStream | null = null;
 
   function setup(dc: RTCDataChannel, ctrl: ControlChannel) {
     dc.addEventListener('open', () => {
       session.setConnection('connected');
       session.setControl(ctrl);
       const have = Array.from(useSessionStore.getState().assets);
-      if (have.length) ctrl.send('manifest.presence', { have }, false).catch(() => {});
+      if (have.length) ctrl.send('asset.presence', { have, missing: [] }, false).catch(() => {});
+      ctrl.setMicStream(localMicStream);
       if (opts.role === 'explorer') {
         peerClock = new PeerClock(ctrl);
         watchClock(peerClock);
         session.setPeerClock(peerClock);
-        stopTelemetry = startTelemetry(ctrl);
+        stopTelemetry = startTelemetry(ctrl, localMicStream);
       }
     });
     dc.addEventListener('close', () => {
@@ -74,6 +76,7 @@ export async function connect(
       session.setConnection('disconnected');
       session.setControl(null);
       session.setTelemetry(null);
+      ctrl.setMicStream(null);
     });
   }
 
@@ -111,6 +114,8 @@ export async function connect(
       } as any,
       video: false,
     });
+    localMicStream = stream;
+    control?.setMicStream(stream);
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
   }
 

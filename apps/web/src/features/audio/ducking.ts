@@ -11,6 +11,13 @@ export interface DuckingOptions {
   release?: number; // seconds
 }
 
+let activeCleanup: (() => void) | null = null;
+
+export function cleanupSpeechDucking() {
+  activeCleanup?.();
+  activeCleanup = null;
+}
+
 /**
  * Monitors a microphone stream and ducks the target gain node when speech is
  * detected. This is a lightweight RMS detector implemented with the Web Audio
@@ -20,7 +27,8 @@ export function setupSpeechDucking(
   mic: MediaStream,
   target: GainNode,
   opts: DuckingOptions = {}
-) {
+): () => void {
+  cleanupSpeechDucking();
   const { thresholdDb = -50, reducedDb = -9, attack = 0.05, release = 0.3 } = opts;
   const ctx = getAudioContext();
   const src = ctx.createMediaStreamSource(mic);
@@ -29,16 +37,34 @@ export function setupSpeechDucking(
   src.connect(analyser);
   const data = new Float32Array(analyser.fftSize);
   const normalGain = target.gain.value;
+  const reductionGain = dbToGain(reducedDb);
+  let rafId: number | null = null;
+  let stopped = false;
+
   function tick() {
+    if (stopped) return;
     analyser.getFloatTimeDomainData(data);
     let sum = 0;
     for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
     const rms = Math.sqrt(sum / data.length);
-    const db = 20 * Math.log10(rms);
-    const desired = db > thresholdDb ? dbToGain(reducedDb) : normalGain;
-    const tc = db > thresholdDb ? attack : release;
+    const levelDb = 20 * Math.log10(Math.max(rms, 1e-8));
+    const desired = levelDb > thresholdDb ? normalGain * reductionGain : normalGain;
+    const tc = levelDb > thresholdDb ? attack : release;
     target.gain.setTargetAtTime(desired, ctx.currentTime, tc);
-    requestAnimationFrame(tick);
+    rafId = requestAnimationFrame(tick);
   }
+
   tick();
+
+  const cleanup = () => {
+    if (stopped) return;
+    stopped = true;
+    if (rafId !== null) cancelAnimationFrame(rafId);
+    src.disconnect();
+    analyser.disconnect();
+    target.gain.setTargetAtTime(normalGain, ctx.currentTime, release);
+  };
+
+  activeCleanup = cleanup;
+  return cleanup;
 }
