@@ -3,7 +3,7 @@ import { useSessionStore } from '../../state/session';
 
 export default function FacilitatorControls() {
   const { assets, control } = useSessionStore(s => ({
-    assets: Array.from(s.assets),
+    assets: Array.from(s.remoteAssets),
     control: s.control,
   }));
 

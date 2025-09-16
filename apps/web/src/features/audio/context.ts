@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 let shared: AudioContext | null = null;
 let master: GainNode | null = null;
 let analyser: AnalyserNode | null = null;
+let programDestination: MediaStreamAudioDestinationNode | null = null;
 
 export function getAudioContext(): AudioContext {
   if (!shared) {
@@ -26,6 +27,15 @@ export function getMasterGain(): GainNode {
 export function getAnalyser(): AnalyserNode {
   if (!analyser) getMasterGain();
   return analyser!;
+}
+
+export function getProgramStream(): MediaStream {
+  if (!programDestination) {
+    const ctx = getAudioContext();
+    programDestination = ctx.createMediaStreamDestination();
+    getMasterGain().connect(programDestination);
+  }
+  return programDestination.stream;
 }
 
 /**

@@ -15,6 +15,7 @@ import {
   type CmdSetGain,
   type CmdDucking,
   type TelemetryLevels,
+  type AssetManifest,
   type AssetPresence,
 } from './protocol';
 
@@ -124,13 +125,15 @@ export class ControlChannel {
       }
       case 'asset.manifest': {
         this.sendAck(msg.txn, true);
+        const { setManifest } = useSessionStore.getState();
+        const manifest = msg.payload as AssetManifest;
+        setManifest(manifest.entries);
         break;
       }
       case 'asset.presence': {
         this.sendAck(msg.txn, true);
-        const { addAsset } = useSessionStore.getState();
-        const { have } = msg.payload as AssetPresence;
-        have.forEach(id => addAsset(id));
+        const { updateRemotePresence } = useSessionStore.getState();
+        updateRemotePresence(msg.payload as AssetPresence);
         break;
       }
       case 'telemetry.levels': {
