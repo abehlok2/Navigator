@@ -60,17 +60,28 @@ export const cmdDuckingSchema = z.object({
 });
 export type CmdDucking = z.infer<typeof cmdDuckingSchema>;
 
-export const manifestPresenceSchema = z.object({
-  have: z.array(z.string()),
+export const assetEntrySchema = z.object({
+  id: z.string(),
+  sha256: z.string(),
+  bytes: z.number(),
 });
-export type ManifestPresence = z.infer<typeof manifestPresenceSchema>;
 
-export const telemetrySchema = z.object({
-  rms: z.number(),
-  peak: z.number(),
-  playing: z.array(z.string()),
+export const assetManifestSchema = z.object({
+  entries: z.array(assetEntrySchema),
 });
-export type Telemetry = z.infer<typeof telemetrySchema>;
+export type AssetManifest = z.infer<typeof assetManifestSchema>;
+
+export const assetPresenceSchema = z.object({
+  have: z.array(z.string()),
+  missing: z.array(z.string()),
+});
+export type AssetPresence = z.infer<typeof assetPresenceSchema>;
+
+export const telemetryLevelsSchema = z.object({
+  mic: z.number(),
+  program: z.number(),
+});
+export type TelemetryLevels = z.infer<typeof telemetryLevelsSchema>;
 
 export const payloadSchemaByType = {
   hello: helloSchema,
@@ -82,8 +93,9 @@ export const payloadSchemaByType = {
   'cmd.crossfade': cmdCrossfadeSchema,
   'cmd.setGain': cmdSetGainSchema,
   'cmd.ducking': cmdDuckingSchema,
-  'manifest.presence': manifestPresenceSchema,
-  telemetry: telemetrySchema,
+  'asset.manifest': assetManifestSchema,
+  'asset.presence': assetPresenceSchema,
+  'telemetry.levels': telemetryLevelsSchema,
 } as const;
 
 export const messageTypes = Object.keys(payloadSchemaByType) as [keyof typeof payloadSchemaByType];

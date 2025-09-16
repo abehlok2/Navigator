@@ -2,6 +2,8 @@ import { z } from 'zod';
 import type { Role } from '../session/api';
 import { useSessionStore } from '../../state/session';
 import { playAt, stop as stopPlayback, crossfade, setGain } from '../audio/scheduler';
+import { getMasterGain } from '../audio/context';
+import { cleanupSpeechDucking, setupSpeechDucking } from '../audio/ducking';
 import {
   wireMessageSchema,
   payloadSchemaByType,
@@ -12,7 +14,8 @@ import {
   type CmdCrossfade,
   type CmdSetGain,
   type CmdDucking,
-  type Telemetry,
+  type TelemetryLevels,
+  type AssetPresence,
 } from './protocol';
 
 interface ControlChannelOptions {
@@ -33,6 +36,8 @@ export class ControlChannel {
   private dc: RTCDataChannel;
   private opts: ControlChannelOptions;
   private pending = new Map<string, Pending>();
+  private micStream: MediaStream | null = null;
+  private duckingConfig: CmdDucking | null = null;
 
   constructor(dc: RTCDataChannel, opts: ControlChannelOptions) {
     this.dc = dc;
@@ -45,6 +50,27 @@ export class ControlChannel {
 
   setClockPongHandler(handler: (pong: { pingId: string; responderNow: number }) => void) {
     this.opts.onClockPong = handler;
+  }
+
+  setMicStream(stream: MediaStream | null) {
+    this.micStream = stream;
+    if (!stream) {
+      cleanupSpeechDucking();
+      return;
+    }
+    if (this.duckingConfig?.enabled) {
+      this.applyDucking(this.duckingConfig);
+    }
+  }
+
+  private applyDucking(cmd: CmdDucking) {
+    if (!this.micStream) return;
+    setupSpeechDucking(this.micStream, getMasterGain(), {
+      thresholdDb: cmd.thresholdDb,
+      reducedDb: cmd.reduceDb,
+      attack: cmd.attackMs / 1000,
+      release: cmd.releaseMs / 1000,
+    });
   }
 
   private onOpen() {
@@ -96,17 +122,21 @@ export class ControlChannel {
         setHeartbeat();
         break;
       }
-      case 'manifest.presence': {
+      case 'asset.manifest': {
+        this.sendAck(msg.txn, true);
+        break;
+      }
+      case 'asset.presence': {
         this.sendAck(msg.txn, true);
         const { addAsset } = useSessionStore.getState();
-        const { have } = msg.payload as { have: string[] };
+        const { have } = msg.payload as AssetPresence;
         have.forEach(id => addAsset(id));
         break;
       }
-      case 'telemetry': {
+      case 'telemetry.levels': {
         this.sendAck(msg.txn, true);
         const { setTelemetry, setHeartbeat } = useSessionStore.getState();
-        setTelemetry(msg.payload as Telemetry);
+        setTelemetry(msg.payload as TelemetryLevels);
         setHeartbeat();
         break;
       }
@@ -140,6 +170,21 @@ export class ControlChannel {
         this.sendAck(msg.txn, true);
         const cmd = msg.payload as CmdSetGain;
         setGain(cmd.id, cmd.gainDb);
+        break;
+      }
+      case 'cmd.ducking': {
+        this.sendAck(msg.txn, true);
+        const cmd = msg.payload as CmdDucking;
+        this.duckingConfig = cmd.enabled ? cmd : null;
+        if (cmd.enabled) {
+          if (!this.micStream) {
+            this.opts.onError?.('ducking enabled but no mic stream');
+          } else {
+            this.applyDucking(cmd);
+          }
+        } else {
+          cleanupSpeechDucking();
+        }
         break;
       }
       default: {

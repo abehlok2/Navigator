@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { Role } from '../features/session/api';
 import type { ControlChannel } from '../features/control/channel';
-import type { Telemetry } from '../features/control/protocol';
+import type { TelemetryLevels } from '../features/control/protocol';
 import type { PeerClock } from '../features/audio/peerClock';
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected';
@@ -11,7 +11,7 @@ interface SessionState {
   connection: ConnectionStatus;
   assets: Set<string>;
   control: ControlChannel | null;
-  telemetry: Telemetry | null;
+  telemetry: TelemetryLevels | null;
   lastHeartbeat: number | null;
   peerClock: PeerClock | null;
   setRole: (role: Role) => void;
@@ -19,7 +19,7 @@ interface SessionState {
   setControl: (control: ControlChannel | null) => void;
   setPeerClock: (clock: PeerClock | null) => void;
   addAsset: (id: string) => void;
-  setTelemetry: (t: Telemetry | null) => void;
+  setTelemetry: (t: TelemetryLevels | null) => void;
   setHeartbeat: () => void;
 }
 
@@ -40,7 +40,7 @@ export const useSessionStore = create<SessionState>(set => ({
       const next = new Set(state.assets);
       next.add(id);
       state.control
-        ?.send('manifest.presence', { have: [id] }, false)
+        ?.send('asset.presence', { have: [id], missing: [] }, false)
         .catch(() => {});
       return { assets: next };
     }),

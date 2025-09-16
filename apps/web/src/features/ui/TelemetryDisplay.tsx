@@ -7,9 +7,8 @@ export default function TelemetryDisplay() {
   return (
     <div className="section">
       <h3>Telemetry</h3>
-      <div>RMS: {telemetry.rms.toFixed(3)}</div>
-      <div>Peak: {telemetry.peak.toFixed(3)}</div>
-      <div>Playing: {telemetry.playing.join(', ') || 'none'}</div>
+      <div>Mic: {telemetry.mic.toFixed(1)} dBFS</div>
+      <div>Program: {telemetry.program.toFixed(1)} dBFS</div>
     </div>
   );
 }
