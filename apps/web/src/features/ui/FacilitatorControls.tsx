@@ -23,12 +23,41 @@ export default function FacilitatorControls() {
   };
 
   const [duck, setDuck] = useState(false);
+  const [threshold, setThreshold] = useState(-40);
+  const [reduction, setReduction] = useState(-12);
+  const attackMs = 10;
+  const releaseMs = 300;
+
+  const sendDucking = (enabled: boolean, nextThreshold = threshold, nextReduction = reduction) => {
+    control
+      ?.ducking({
+        enabled,
+        thresholdDb: nextThreshold,
+        reduceDb: nextReduction,
+        attackMs,
+        releaseMs,
+      })
+      .catch(() => {});
+  };
+
   const toggleDucking = () => {
     const next = !duck;
     setDuck(next);
-    control
-      ?.ducking({ enabled: next, thresholdDb: -40, reduceDb: -12, attackMs: 10, releaseMs: 300 })
-      .catch(() => {});
+    sendDucking(next);
+  };
+
+  const updateThreshold = (value: number) => {
+    setThreshold(value);
+    if (duck) {
+      sendDucking(true, value, reduction);
+    }
+  };
+
+  const updateReduction = (value: number) => {
+    setReduction(value);
+    if (duck) {
+      sendDucking(true, threshold, value);
+    }
   };
 
   return (
@@ -67,6 +96,43 @@ export default function FacilitatorControls() {
         <label>
           <input type="checkbox" checked={duck} onChange={toggleDucking} /> Enable ducking
         </label>
+        <div className="mt-2 space-y-2 text-sm text-gray-600">
+          <div>
+            Facilitator speech is mixed with the local microphone fallback before driving the
+            ducking detector.
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="flex items-center gap-2">
+              <span className="w-32">Threshold</span>
+              <input
+                type="range"
+                min={-80}
+                max={-10}
+                step={1}
+                value={threshold}
+                onChange={e => updateThreshold(Number(e.target.value))}
+                disabled={!control}
+              />
+              <span className="w-16 text-right">{threshold} dBFS</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <span className="w-32">Reduction</span>
+              <input
+                type="range"
+                min={-24}
+                max={0}
+                step={1}
+                value={reduction}
+                onChange={e => updateReduction(Number(e.target.value))}
+                disabled={!control}
+              />
+              <span className="w-16 text-right">{reduction} dB</span>
+            </label>
+            <div className="text-xs text-gray-500">
+              Attack {attackMs} ms · Release {releaseMs} ms
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -44,6 +44,11 @@ describe('ControlChannel message handling', () => {
       setupSpeechDucking: vi.fn(),
       cleanupSpeechDucking: vi.fn(),
     }));
+    vi.doMock('../../audio/speech', () => ({
+      __esModule: true,
+      setLocalSpeechFallback: vi.fn(),
+      hasSpeechInput: vi.fn(() => false),
+    }));
 
     const { useSessionStore } = await import('../../../state/session');
     useSessionStore.setState({ telemetry: null, lastHeartbeat: null });
@@ -107,12 +112,19 @@ describe('ControlChannel message handling', () => {
 
     const setupSpeechDucking = vi.fn();
     const cleanupSpeechDucking = vi.fn();
+    const setLocalSpeechFallback = vi.fn();
+    const hasSpeechInput = vi.fn(() => true);
 
     vi.doMock('../../audio/context', () => ({ __esModule: true, getMasterGain: vi.fn(() => 'master-gain') }));
     vi.doMock('../../audio/ducking', () => ({
       __esModule: true,
       setupSpeechDucking,
       cleanupSpeechDucking,
+    }));
+    vi.doMock('../../audio/speech', () => ({
+      __esModule: true,
+      setLocalSpeechFallback,
+      hasSpeechInput,
     }));
 
     const { ControlChannel } = await import('../channel');
@@ -128,6 +140,7 @@ describe('ControlChannel message handling', () => {
 
     const micStream = { id: 'mic' } as unknown as MediaStream;
     channel.setMicStream(micStream);
+    expect(setLocalSpeechFallback).toHaveBeenCalledWith(micStream);
 
     const enableMessage = {
       data: JSON.stringify({
@@ -146,7 +159,7 @@ describe('ControlChannel message handling', () => {
     dc.send.mockClear();
     dc.emit('message', enableMessage);
 
-    expect(setupSpeechDucking).toHaveBeenCalledWith(micStream, 'master-gain', {
+    expect(setupSpeechDucking).toHaveBeenCalledWith('master-gain', {
       thresholdDb: -42,
       reducedDb: -9,
       attack: 0.02,
@@ -199,6 +212,11 @@ describe('ControlChannel message handling', () => {
       __esModule: true,
       setupSpeechDucking: vi.fn(),
       cleanupSpeechDucking: vi.fn(),
+    }));
+    vi.doMock('../../audio/speech', () => ({
+      __esModule: true,
+      setLocalSpeechFallback: vi.fn(),
+      hasSpeechInput: vi.fn(() => false),
     }));
 
     const { useSessionStore } = await import('../../../state/session');
@@ -262,6 +280,11 @@ describe('ControlChannel message handling', () => {
       __esModule: true,
       setupSpeechDucking: vi.fn(),
       cleanupSpeechDucking: vi.fn(),
+    }));
+    vi.doMock('../../audio/speech', () => ({
+      __esModule: true,
+      setLocalSpeechFallback: vi.fn(),
+      hasSpeechInput: vi.fn(() => false),
     }));
 
     const { useSessionStore } = await import('../../../state/session');
@@ -343,6 +366,11 @@ describe('ControlChannel message handling', () => {
       setupSpeechDucking: vi.fn(),
       cleanupSpeechDucking: vi.fn(),
     }));
+    vi.doMock('../../audio/speech', () => ({
+      __esModule: true,
+      setLocalSpeechFallback: vi.fn(),
+      hasSpeechInput: vi.fn(() => false),
+    }));
 
     const { useSessionStore } = await import('../../../state/session');
     useSessionStore.setState({
@@ -416,6 +444,11 @@ describe('ControlChannel message handling', () => {
       __esModule: true,
       setupSpeechDucking: vi.fn(),
       cleanupSpeechDucking: vi.fn(),
+    }));
+    vi.doMock('../../audio/speech', () => ({
+      __esModule: true,
+      setLocalSpeechFallback: vi.fn(),
+      hasSpeechInput: vi.fn(() => false),
     }));
 
     const { useSessionStore } = await import('../../../state/session');

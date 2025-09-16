@@ -1,4 +1,4 @@
-import { getAudioContext } from './context';
+import { getAudioContext, getDuckingBus } from './context';
 
 function dbToGain(db: number): number {
   return Math.pow(10, db / 20);
@@ -19,22 +19,19 @@ export function cleanupSpeechDucking() {
 }
 
 /**
- * Monitors a microphone stream and ducks the target gain node when speech is
+ * Monitors the shared ducking bus—which includes remote facilitator speech and
+ * local microphone fallback—and ducks the target gain node when speech is
  * detected. This is a lightweight RMS detector implemented with the Web Audio
  * API's AnalyserNode.
  */
-export function setupSpeechDucking(
-  mic: MediaStream,
-  target: GainNode,
-  opts: DuckingOptions = {}
-): () => void {
+export function setupSpeechDucking(target: GainNode, opts: DuckingOptions = {}): () => void {
   cleanupSpeechDucking();
   const { thresholdDb = -50, reducedDb = -9, attack = 0.05, release = 0.3 } = opts;
   const ctx = getAudioContext();
-  const src = ctx.createMediaStreamSource(mic);
+  const bus = getDuckingBus();
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 256;
-  src.connect(analyser);
+  bus.connect(analyser);
   const data = new Float32Array(analyser.fftSize);
   const normalGain = target.gain.value;
   const reductionGain = dbToGain(reducedDb);
@@ -60,7 +57,11 @@ export function setupSpeechDucking(
     if (stopped) return;
     stopped = true;
     if (rafId !== null) cancelAnimationFrame(rafId);
-    src.disconnect();
+    try {
+      bus.disconnect(analyser);
+    } catch {
+      // analyser may already be disconnected
+    }
     analyser.disconnect();
     target.gain.setTargetAtTime(normalGain, ctx.currentTime, release);
   };

@@ -1,5 +1,5 @@
 import type { ControlChannel } from '../control/channel';
-import { getAnalyser, getAudioContext } from './context';
+import { getAnalyser, getAudioContext, getDuckingBus } from './context';
 
 const MIN_DBFS = -100;
 
@@ -14,21 +14,15 @@ function bufferToDb(buffer: Float32Array): number {
   return Math.max(MIN_DBFS, db);
 }
 
-export function startTelemetry(control: ControlChannel, micStream?: MediaStream | null): () => void {
+export function startTelemetry(control: ControlChannel): () => void {
   const analyser = getAnalyser();
   const buffer = new Float32Array(analyser.fftSize);
   const ctx = getAudioContext();
-  let micAnalyser: AnalyserNode | null = null;
-  let micSource: MediaStreamAudioSourceNode | null = null;
-  let micBuffer: Float32Array<ArrayBuffer> | null = null;
-
-  if (micStream) {
-    micAnalyser = ctx.createAnalyser();
-    micAnalyser.fftSize = analyser.fftSize;
-    micSource = ctx.createMediaStreamSource(micStream);
-    micSource.connect(micAnalyser);
-    micBuffer = new Float32Array(analyser.fftSize) as Float32Array<ArrayBuffer>;
-  }
+  const speechAnalyser = ctx.createAnalyser();
+  speechAnalyser.fftSize = analyser.fftSize;
+  const duckingBus = getDuckingBus();
+  duckingBus.connect(speechAnalyser);
+  const speechBuffer = new Float32Array(speechAnalyser.fftSize);
 
   let stopped = false;
   let timer: number | null = null;
@@ -37,12 +31,9 @@ export function startTelemetry(control: ControlChannel, micStream?: MediaStream 
     if (stopped) return;
     analyser.getFloatTimeDomainData(buffer);
     const program = bufferToDb(buffer);
-    let mic = MIN_DBFS;
-    if (micAnalyser && micBuffer) {
-      micAnalyser.getFloatTimeDomainData(micBuffer);
-      mic = bufferToDb(micBuffer);
-    }
-    control.send('telemetry.levels', { mic, program }, false).catch(() => {});
+    speechAnalyser.getFloatTimeDomainData(speechBuffer);
+    const speech = bufferToDb(speechBuffer);
+    control.send('telemetry.levels', { mic: speech, program }, false).catch(() => {});
     timer = window.setTimeout(tick, 500);
   }
 
@@ -51,7 +42,11 @@ export function startTelemetry(control: ControlChannel, micStream?: MediaStream 
   return () => {
     stopped = true;
     if (timer !== null) window.clearTimeout(timer);
-    micSource?.disconnect();
-    micAnalyser?.disconnect();
+    try {
+      duckingBus.disconnect(speechAnalyser);
+    } catch {
+      // already disconnected
+    }
+    speechAnalyser.disconnect();
   };
 }

@@ -13,6 +13,7 @@ import {
 } from '../audio/scheduler';
 import { getMasterGain } from '../audio/context';
 import { cleanupSpeechDucking, setupSpeechDucking } from '../audio/ducking';
+import { hasSpeechInput, setLocalSpeechFallback } from '../audio/speech';
 import { loadRemoteAsset, hasBuffer, removeBuffer } from '../audio/assets';
 import {
   wireMessageSchema,
@@ -50,7 +51,6 @@ export class ControlChannel {
   private dc: RTCDataChannel;
   private opts: ControlChannelOptions;
   private pending = new Map<string, Pending>();
-  private micStream: MediaStream | null = null;
   private duckingConfig: CmdDucking | null = null;
 
   constructor(dc: RTCDataChannel, opts: ControlChannelOptions) {
@@ -67,19 +67,19 @@ export class ControlChannel {
   }
 
   setMicStream(stream: MediaStream | null) {
-    this.micStream = stream;
-    if (!stream) {
-      cleanupSpeechDucking();
-      return;
-    }
+    setLocalSpeechFallback(stream);
     if (this.duckingConfig?.enabled) {
       this.applyDucking(this.duckingConfig);
+    } else if (!hasSpeechInput()) {
+      cleanupSpeechDucking();
     }
   }
 
   private applyDucking(cmd: CmdDucking) {
-    if (!this.micStream) return;
-    setupSpeechDucking(this.micStream, getMasterGain(), {
+    if (!hasSpeechInput()) {
+      this.opts.onError?.('ducking enabled but no speech input available');
+    }
+    setupSpeechDucking(getMasterGain(), {
       thresholdDb: cmd.thresholdDb,
       reducedDb: cmd.reduceDb,
       attack: cmd.attackMs / 1000,
@@ -211,11 +211,7 @@ export class ControlChannel {
         const cmd = msg.payload as CmdDucking;
         this.duckingConfig = cmd.enabled ? cmd : null;
         if (cmd.enabled) {
-          if (!this.micStream) {
-            this.opts.onError?.('ducking enabled but no mic stream');
-          } else {
-            this.applyDucking(cmd);
-          }
+          this.applyDucking(cmd);
         } else {
           cleanupSpeechDucking();
         }

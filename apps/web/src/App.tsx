@@ -7,6 +7,7 @@ import FacilitatorControls from './features/ui/FacilitatorControls';
 import RecordingControls from './features/ui/RecordingControls';
 import TelemetryDisplay from './features/ui/TelemetryDisplay';
 import { useAudioContextUnlock } from './features/audio/context';
+import { attachRemoteFacilitatorStream, resetRemoteFacilitatorStreams } from './features/audio/speech';
 import AuthForm from './features/auth/AuthForm';
 import { useAuthStore } from './state/auth';
 import { useSessionStore } from './state/session';
@@ -19,8 +20,7 @@ const isRole = (value: string | null): value is Role =>
 export default function App() {
   const rootRef = useRef<HTMLDivElement>(null);
   useAudioContextUnlock(rootRef);
-  const remoteAudioContainerRef = useRef<HTMLDivElement>(null);
-  const remoteAudioElements = useRef(new Map<string, HTMLAudioElement>());
+  const remoteStreamCleanups = useRef(new Map<string, () => void>());
   const disconnectRef = useRef<(() => void) | null>(null);
   const { token, logout, username, role } = useAuthStore(s => ({
     token: s.token,
@@ -37,40 +37,30 @@ export default function App() {
   const sessionRole = useSessionStore(state => state.role);
 
   const cleanupRemoteAudio = useCallback(() => {
-    remoteAudioElements.current.forEach(audio => {
-      audio.srcObject = null;
-      audio.remove();
-    });
-    remoteAudioElements.current.clear();
+    remoteStreamCleanups.current.forEach(cleanup => cleanup());
+    remoteStreamCleanups.current.clear();
+    resetRemoteFacilitatorStreams();
   }, []);
 
   const handleTrack = useCallback(
     (event: RTCTrackEvent) => {
       if (event.track.kind !== 'audio') return;
-      const container = remoteAudioContainerRef.current;
-      if (!container) return;
       const streams = event.streams.length
         ? event.streams
         : [new MediaStream([event.track])];
       streams.forEach(stream => {
         const key = stream.id;
-        const existing = remoteAudioElements.current.get(key);
-        if (!existing) {
-          const audioEl = document.createElement('audio');
-          audioEl.autoplay = true;
-          audioEl.controls = false;
-          audioEl.srcObject = stream;
-          container.appendChild(audioEl);
-          remoteAudioElements.current.set(key, audioEl);
-          void audioEl.play().catch(() => {});
-        } else {
-          if (existing.srcObject !== stream) {
-            existing.srcObject = stream;
-          }
-          if (existing.paused) {
-            void existing.play().catch(() => {});
-          }
-        }
+        remoteStreamCleanups.current.get(key)?.();
+        const detach = attachRemoteFacilitatorStream(stream);
+        const cleanup = () => {
+          detach();
+          stream.removeEventListener('removetrack', cleanup);
+          stream.getTracks().forEach(track => track.removeEventListener('ended', cleanup));
+          remoteStreamCleanups.current.delete(key);
+        };
+        stream.addEventListener('removetrack', cleanup);
+        stream.getTracks().forEach(track => track.addEventListener('ended', cleanup));
+        remoteStreamCleanups.current.set(key, cleanup);
       });
     },
     []
@@ -191,7 +181,6 @@ export default function App() {
         </div>
         {error && <div className="text-sm text-red-600">{error}</div>}
       </div>
-      <div ref={remoteAudioContainerRef} />
     </div>
   );
 }

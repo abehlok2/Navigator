@@ -4,6 +4,8 @@ let shared: AudioContext | null = null;
 let master: GainNode | null = null;
 let analyser: AnalyserNode | null = null;
 let programDestination: MediaStreamAudioDestinationNode | null = null;
+let remoteFacilitatorBus: GainNode | null = null;
+let duckingBus: GainNode | null = null;
 
 export function getAudioContext(): AudioContext {
   if (!shared) {
@@ -36,6 +38,26 @@ export function getProgramStream(): MediaStream {
     getMasterGain().connect(programDestination);
   }
   return programDestination.stream;
+}
+
+export function getDuckingBus(): GainNode {
+  const ctx = getAudioContext();
+  if (!duckingBus) {
+    duckingBus = ctx.createGain();
+    duckingBus.gain.value = 1;
+  }
+  return duckingBus;
+}
+
+export function getRemoteFacilitatorBus(): GainNode {
+  const ctx = getAudioContext();
+  if (!remoteFacilitatorBus) {
+    remoteFacilitatorBus = ctx.createGain();
+    remoteFacilitatorBus.gain.value = 1;
+    remoteFacilitatorBus.connect(getMasterGain());
+    remoteFacilitatorBus.connect(getDuckingBus());
+  }
+  return remoteFacilitatorBus;
 }
 
 /**
