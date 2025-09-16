@@ -245,6 +245,10 @@ export class ControlChannel {
     });
   }
 
+  setManifest(entries: AssetManifest['entries']) {
+    return this.send('asset.manifest', { entries });
+  }
+
   play(cmd: CmdPlay) {
     return this.send('cmd.play', cmd);
   }
