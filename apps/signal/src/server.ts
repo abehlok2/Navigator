@@ -14,6 +14,7 @@ import {
   getRoom,
   attachSocket,
   getParticipant,
+  listParticipants,
   touchParticipant,
   cleanupInactiveParticipants,
   setPassword,
@@ -40,6 +41,14 @@ app.use(express.json());
 
 const SESSION_TIMEOUT_MS = Number(process.env.SESSION_TIMEOUT_MS ?? 30 * 60 * 1000);
 const TOKEN_TIMEOUT_MS = Number(process.env.TOKEN_INACTIVITY_MS ?? 15 * 60 * 1000);
+
+const LISTENER_ALLOWED_TYPES: ReadonlySet<WireMessage['type']> = new Set([
+  'sdp',
+  'ice',
+  'ack',
+  'hello',
+  'clock.pong',
+]);
 
 function authMiddleware(requiredRole?: Role) {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -117,7 +126,8 @@ app.post('/rooms/:roomId/join', authMiddleware(), (req, res) => {
       return;
     }
     const participant = addParticipant(req.params.roomId, role);
-    res.json({ participantId: participant.id, turn: TURN_CONFIG });
+    const participants = listParticipants(req.params.roomId).map(p => ({ id: p.id, role: p.role }));
+    res.json({ participantId: participant.id, turn: TURN_CONFIG, participants });
   } catch {
     res.status(400).json({ error: 'invalid request or room not found' });
   }
@@ -127,6 +137,20 @@ app.post('/rooms/:roomId/leave', authMiddleware(), (req, res) => {
   const { participantId } = req.body as { participantId: string };
   removeParticipant(req.params.roomId, participantId);
   res.sendStatus(204);
+});
+
+app.get('/rooms/:roomId/participants', authMiddleware(), (req, res) => {
+  const room = getRoom(req.params.roomId);
+  if (!room) {
+    res.status(404).json({ error: 'room not found' });
+    return;
+  }
+  const participants = listParticipants(room.id).map(p => ({
+    id: p.id,
+    role: p.role,
+    connected: Boolean(p.ws),
+  }));
+  res.json({ participants });
 });
 
 app.post('/rooms/:roomId/role', authMiddleware('facilitator'), (req, res) => {
@@ -197,16 +221,16 @@ wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
 
   ws.on('message', (data: RawData) => {
     touchParticipant(roomId, participantId);
-    if (participant.role === 'listener') {
-      // listeners are read-only
-      return;
-    }
-
     let msg: WireMessage;
     try {
       msg = messageSchema.parse(JSON.parse(data.toString()));
     } catch {
       ws.send(JSON.stringify({ type: 'error', error: 'invalid message' }));
+      return;
+    }
+
+    if (participant.role === 'listener' && !LISTENER_ALLOWED_TYPES.has(msg.type)) {
+      ws.send(JSON.stringify({ type: 'error', error: 'listener cannot send this message' }));
       return;
     }
 
@@ -225,7 +249,7 @@ wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
   });
 
   ws.on('close', () => {
-    attachSocket(roomId, participantId);
+    removeParticipant(roomId, participantId);
   });
 
   ws.send(JSON.stringify({ type: 'credentials', payload: TURN_CONFIG }));

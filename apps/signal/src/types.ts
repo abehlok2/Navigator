@@ -92,6 +92,31 @@ export const cmdCrossfadeMessage = controlEnvelope.extend({
   }),
 });
 
+export const cmdLoadMessage = controlEnvelope.extend({
+  type: z.literal('cmd.load'),
+  payload: z.object({
+    id: z.string(),
+    sha256: z.string().optional(),
+    bytes: z.number().optional(),
+    source: z.string().optional(),
+  }),
+});
+
+export const cmdUnloadMessage = controlEnvelope.extend({
+  type: z.literal('cmd.unload'),
+  payload: z.object({
+    id: z.string(),
+  }),
+});
+
+export const cmdSeekMessage = controlEnvelope.extend({
+  type: z.literal('cmd.seek'),
+  payload: z.object({
+    id: z.string(),
+    offset: z.number(),
+  }),
+});
+
 export const cmdSetGainMessage = controlEnvelope.extend({
   type: z.literal('cmd.setGain'),
   payload: z.object({
@@ -138,8 +163,11 @@ export const messageSchema = z.union([
   clockPongMessage,
   assetManifestMessage,
   assetPresenceMessage,
+  cmdLoadMessage,
+  cmdUnloadMessage,
   cmdPlayMessage,
   cmdStopMessage,
+  cmdSeekMessage,
   cmdCrossfadeMessage,
   cmdSetGainMessage,
   cmdDuckingMessage,

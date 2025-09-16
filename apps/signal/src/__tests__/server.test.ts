@@ -34,6 +34,7 @@ vi.mock('express', () => {
   const app = {
     use: vi.fn(),
     post: vi.fn(),
+    get: vi.fn(),
   };
   const express = () => app;
   (express as any).json = () => () => undefined;
@@ -87,6 +88,7 @@ vi.mock('../storage.js', () => ({
 describe('signal server websocket forwarding', () => {
   let createRoom: typeof import('../rooms.ts').createRoom;
   let addParticipant: typeof import('../rooms.ts').addParticipant;
+  let listParticipants: typeof import('../rooms.ts').listParticipants;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -98,6 +100,7 @@ describe('signal server websocket forwarding', () => {
     const rooms = await import('../rooms.ts');
     createRoom = rooms.createRoom;
     addParticipant = rooms.addParticipant;
+    listParticipants = rooms.listParticipants;
   });
 
   afterEach(() => {
@@ -139,6 +142,18 @@ describe('signal server websocket forwarding', () => {
         payload: { entries: [{ id: 'asset1', sha256: 'abc', bytes: 512 }] },
       },
       {
+        type: 'cmd.load' as const,
+        payload: { id: 'asset1', sha256: 'abc', bytes: 512, source: 'https://cdn.example/asset1' },
+      },
+      {
+        type: 'cmd.seek' as const,
+        payload: { id: 'asset1', offset: 1.5 },
+      },
+      {
+        type: 'cmd.unload' as const,
+        payload: { id: 'asset1' },
+      },
+      {
         type: 'telemetry.levels' as const,
         payload: { mic: -12.3, program: -6.1 },
       },
@@ -161,5 +176,87 @@ describe('signal server websocket forwarding', () => {
       const forwarded = JSON.parse(receiverSocket.send.mock.calls[0][0] as string);
       expect(forwarded).toEqual({ ...wire, from: sender.id });
     }
+  });
+
+  it('allows listeners to exchange signaling but blocks control commands', () => {
+    const handler = connectionHandlers.at(-1);
+    expect(handler).toBeTruthy();
+    if (!handler) return;
+
+    const room = createRoom('room-listener');
+    const facilitator = addParticipant(room.id, 'facilitator');
+    const listener = addParticipant(room.id, 'listener');
+
+    const tokenMap = new Map<string, { username: string; role: string }>([
+      ['token-facilitator', { username: 'facilitator', role: 'facilitator' }],
+      ['token-listener', { username: 'listener', role: 'listener' }],
+    ]);
+    authenticateMock.mockImplementation(token => tokenMap.get(token) ?? null);
+
+    const connect = (participantId: string, token: string) => {
+      const ws = new FakeWebSocket();
+      const req = {
+        url: `/ws?roomId=${room.id}&participantId=${participantId}`,
+        headers: { 'sec-websocket-protocol': token },
+      } as any;
+      handler(ws, req);
+      return ws;
+    };
+
+    const facilitatorSocket = connect(facilitator.id, 'token-facilitator');
+    const listenerSocket = connect(listener.id, 'token-listener');
+
+    facilitatorSocket.send.mockClear();
+    listenerSocket.send.mockClear();
+
+    const sdpWire = {
+      type: 'sdp',
+      roomId: room.id,
+      target: facilitator.id,
+      description: { type: 'answer', sdp: 'v=0' },
+    };
+    listenerSocket.emit('message', Buffer.from(JSON.stringify(sdpWire)));
+    expect(facilitatorSocket.send).toHaveBeenCalledTimes(1);
+    const forwarded = JSON.parse(facilitatorSocket.send.mock.calls[0][0] as string);
+    expect(forwarded).toMatchObject({ type: 'sdp', from: listener.id, description: { type: 'answer' } });
+
+    facilitatorSocket.send.mockClear();
+    listenerSocket.send.mockClear();
+
+    const forbidden = {
+      type: 'cmd.play',
+      roomId: room.id,
+      target: facilitator.id,
+      payload: { id: 'track1' },
+    };
+    listenerSocket.emit('message', Buffer.from(JSON.stringify(forbidden)));
+    expect(listenerSocket.send).toHaveBeenCalledTimes(1);
+    const error = JSON.parse(listenerSocket.send.mock.calls[0][0] as string);
+    expect(error.error).toContain('listener');
+    expect(facilitatorSocket.send).not.toHaveBeenCalled();
+  });
+
+  it('removes participants when websocket closes', () => {
+    const handler = connectionHandlers.at(-1);
+    expect(handler).toBeTruthy();
+    if (!handler) return;
+
+    const room = createRoom('room-close');
+    const facilitator = addParticipant(room.id, 'facilitator');
+
+    const tokenMap = new Map<string, { username: string; role: string }>([
+      ['token-facilitator', { username: 'facilitator', role: 'facilitator' }],
+    ]);
+    authenticateMock.mockImplementation(token => tokenMap.get(token) ?? null);
+
+    const ws = new FakeWebSocket();
+    const req = {
+      url: `/ws?roomId=${room.id}&participantId=${facilitator.id}`,
+      headers: { 'sec-websocket-protocol': 'token-facilitator' },
+    } as any;
+    handler(ws, req);
+    expect(listParticipants(room.id)).toHaveLength(1);
+    ws.emit('close', undefined);
+    expect(listParticipants(room.id)).toHaveLength(0);
   });
 });
