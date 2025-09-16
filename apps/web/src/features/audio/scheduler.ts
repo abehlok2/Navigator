@@ -41,8 +41,23 @@ export function seek(id: string, offset: number) {
   players.get(id)?.seek(offset);
 }
 
+export function unload(id: string) {
+  const player = players.get(id);
+  if (player) {
+    player.stop();
+    players.delete(id);
+  }
+}
+
 export function setGain(id: string, db: number) {
   players.get(id)?.setGain(db);
+}
+
+export function invalidate(id: string) {
+  const player = players.get(id);
+  if (player && !player.isPlaying()) {
+    players.delete(id);
+  }
 }
 
 export { crossfade };
