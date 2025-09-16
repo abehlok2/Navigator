@@ -71,11 +71,11 @@ export async function connect(
         peerClock = new PeerClock(ctrl);
         watchClock(peerClock);
         session.setPeerClock(peerClock);
-        stopTelemetry = startTelemetry(ctrl, localMicStream);
+        stopTelemetry = startTelemetry(ctrl);
       }
     });
     dc.addEventListener('close', () => {
-      stopTelemetry?.();
+    stopTelemetry?.();
       peerClock?.stop();
       session.setPeerClock(null);
       session.setConnection('disconnected');

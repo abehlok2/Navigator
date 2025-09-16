@@ -7,8 +7,11 @@ export default function TelemetryDisplay() {
   return (
     <div className="section">
       <h3>Telemetry</h3>
-      <div>Mic: {telemetry.mic.toFixed(1)} dBFS</div>
+      <div>Speech Input: {telemetry.mic.toFixed(1)} dBFS</div>
       <div>Program: {telemetry.program.toFixed(1)} dBFS</div>
+      <div className="text-xs text-gray-500">
+        Speech input mixes remote facilitator audio with the local microphone fallback.
+      </div>
     </div>
   );
 }
