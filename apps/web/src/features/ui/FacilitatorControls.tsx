@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useSessionStore } from '../../state/session';
+import ManifestEditor from './ManifestEditor';
 
 export default function FacilitatorControls() {
   const { assets, control } = useSessionStore(s => ({
@@ -31,8 +32,9 @@ export default function FacilitatorControls() {
   };
 
   return (
-    <div className="section">
+    <div className="section space-y-4">
       <h2>Facilitator Controls</h2>
+      <ManifestEditor />
       <ul>
         {assets.map(id => (
           <li key={id} style={{ marginBottom: '0.5rem' }}>

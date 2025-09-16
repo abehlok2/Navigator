@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 class FakeDataChannel {
-  public send = vi.fn<(data: string) => void>();
+  public send = vi.fn<[string], void>();
   private listeners = new Map<string, Array<(ev: any) => void>>();
 
   addEventListener(event: string, handler: (ev: any) => void) {
@@ -39,7 +39,7 @@ describe('ControlChannel message handling', () => {
       cleanupSpeechDucking: vi.fn(),
     }));
 
-    const { useSessionStore } = await import('../../../state/session.ts');
+    const { useSessionStore } = await import('../../../state/session');
     useSessionStore.setState({ telemetry: null, lastHeartbeat: null });
     const state = useSessionStore.getState();
     const telemetrySpy = vi.spyOn(state, 'setTelemetry');
