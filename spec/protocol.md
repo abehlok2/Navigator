@@ -90,6 +90,7 @@ interface CmdCrossfade {
   fromId: string;
   toId: string;
   duration: number; // seconds
+  toOffset?: number; // seconds into destination asset
 }
 
 interface CmdSetGain { id: string; gainDb: number; }

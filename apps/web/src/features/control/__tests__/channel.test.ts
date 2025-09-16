@@ -36,6 +36,7 @@ describe('ControlChannel message handling', () => {
       seek: vi.fn(),
       unload: vi.fn(),
       invalidate: vi.fn(),
+      getPlayer: vi.fn(),
     }));
     vi.doMock('../../audio/context', () => ({ __esModule: true, getMasterGain: vi.fn(() => ({})) }));
     vi.doMock('../../audio/ducking', () => ({
@@ -101,6 +102,7 @@ describe('ControlChannel message handling', () => {
       seek: vi.fn(),
       unload: vi.fn(),
       invalidate: vi.fn(),
+      getPlayer: vi.fn(),
     }));
 
     const setupSpeechDucking = vi.fn();
@@ -174,6 +176,62 @@ describe('ControlChannel message handling', () => {
     expect(dc.send).toHaveBeenCalled();
   });
 
+  it('crossfades without restarting an active source', async () => {
+    const existingFrom = { isPlaying: vi.fn(() => true) };
+    const toPlayer = {};
+    const playAt = vi.fn(() => toPlayer);
+    const crossfade = vi.fn();
+    const getPlayer = vi.fn(() => existingFrom as any);
+
+    vi.doMock('../../audio/scheduler', () => ({
+      __esModule: true,
+      playAt,
+      stop: vi.fn(),
+      crossfade,
+      setGain: vi.fn(),
+      seek: vi.fn(),
+      unload: vi.fn(),
+      invalidate: vi.fn(),
+      getPlayer,
+    }));
+    vi.doMock('../../audio/context', () => ({ __esModule: true, getMasterGain: vi.fn(() => ({})) }));
+    vi.doMock('../../audio/ducking', () => ({
+      __esModule: true,
+      setupSpeechDucking: vi.fn(),
+      cleanupSpeechDucking: vi.fn(),
+    }));
+
+    const { useSessionStore } = await import('../../../state/session');
+    useSessionStore.setState({ peerClock: { now: () => 0 } as any });
+
+    const { ControlChannel } = await import('../channel');
+
+    const dc = new FakeDataChannel();
+    new ControlChannel(dc as unknown as RTCDataChannel, {
+      role: 'explorer',
+      roomId: 'room',
+      version: 'v1',
+      onError: vi.fn(),
+    });
+
+    const payload = { fromId: 'a', toId: 'b', duration: 3, toOffset: 1.25 };
+    dc.emit('message', {
+      data: JSON.stringify({ type: 'cmd.crossfade', txn: 'txn-cross', payload }),
+    });
+
+    expect(getPlayer).toHaveBeenCalledWith('a');
+    expect(existingFrom.isPlaying).toHaveBeenCalled();
+    expect(playAt).toHaveBeenCalledTimes(1);
+    const [idArg, clockArg, atArg, offsetArg] = playAt.mock.calls[0];
+    expect(idArg).toBe('b');
+    expect(clockArg).toBe(useSessionStore.getState().peerClock);
+    expect(atArg).toBeUndefined();
+    expect(offsetArg).toBe(1.25);
+    expect(crossfade).toHaveBeenCalledWith(existingFrom, toPlayer, 3);
+    const ack = JSON.parse(dc.send.mock.calls.at(-1)?.[0] as string);
+    expect(ack.payload).toEqual({ ok: true, forTxn: 'txn-cross' });
+  });
+
   it('loads assets on cmd.load and acknowledges success', async () => {
     const invalidate = vi.fn();
     const unload = vi.fn();
@@ -191,6 +249,7 @@ describe('ControlChannel message handling', () => {
       seek,
       unload,
       invalidate,
+      getPlayer: vi.fn(),
     }));
     vi.doMock('../../audio/assets', () => ({
       __esModule: true,
@@ -270,6 +329,7 @@ describe('ControlChannel message handling', () => {
       seek,
       unload,
       invalidate,
+      getPlayer: vi.fn(),
     }));
     vi.doMock('../../audio/assets', () => ({
       __esModule: true,
@@ -343,6 +403,7 @@ describe('ControlChannel message handling', () => {
       seek,
       unload,
       invalidate,
+      getPlayer: vi.fn(),
     }));
     vi.doMock('../../audio/assets', () => ({
       __esModule: true,
@@ -399,6 +460,7 @@ describe('ControlChannel message handling', () => {
       seek,
       unload: vi.fn(),
       invalidate: vi.fn(),
+      getPlayer: vi.fn(),
     }));
     vi.doMock('../../audio/assets', () => ({
       __esModule: true,

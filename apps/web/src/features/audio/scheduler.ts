@@ -4,6 +4,17 @@ import { getBuffer } from './assets';
 import { FilePlayer, crossfade } from './filePlayer';
 
 const players = new Map<string, FilePlayer>();
+
+function ensurePlayer(id: string): FilePlayer {
+  let player = players.get(id);
+  if (!player) {
+    const buffer = getBuffer(id);
+    if (!buffer) throw new Error(`Unknown asset: ${id}`);
+    player = new FilePlayer(buffer);
+    players.set(id, player);
+  }
+  return player;
+}
 let detachClock: (() => void) | null = null;
 
 /**
@@ -17,13 +28,7 @@ export function playAt(
   offset = 0,
   gainDb = 0
 ): FilePlayer {
-  const buffer = getBuffer(id);
-  if (!buffer) throw new Error(`Unknown asset: ${id}`);
-  let player = players.get(id);
-  if (!player) {
-    player = new FilePlayer(buffer);
-    players.set(id, player);
-  }
+  const player = ensurePlayer(id);
   const ctx = getAudioContext();
   const nowPeer = clock.now();
   const deltaMs = (atPeerTime ?? nowPeer) - nowPeer;
@@ -61,6 +66,10 @@ export function invalidate(id: string) {
 }
 
 export { crossfade };
+
+export function getPlayer(id: string): FilePlayer | undefined {
+  return players.get(id);
+}
 
 export function getPlaying(): string[] {
   const ids: string[] = [];

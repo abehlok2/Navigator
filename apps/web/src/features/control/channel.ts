@@ -9,6 +9,7 @@ import {
   seek as seekTo,
   unload as unloadPlayer,
   invalidate as invalidatePlayer,
+  getPlayer,
 } from '../audio/scheduler';
 import { getMasterGain } from '../audio/context';
 import { cleanupSpeechDucking, setupSpeechDucking } from '../audio/ducking';
@@ -181,9 +182,11 @@ export class ControlChannel {
         const cmd = msg.payload as CmdCrossfade;
         const { peerClock } = useSessionStore.getState();
         if (peerClock) {
-          const a = playAt(cmd.fromId, peerClock);
-          const b = playAt(cmd.toId, peerClock);
-          crossfade(a, b, cmd.duration);
+          const existing = getPlayer(cmd.fromId);
+          const fromPlayer =
+            existing && existing.isPlaying() ? existing : playAt(cmd.fromId, peerClock);
+          const toPlayer = playAt(cmd.toId, peerClock, undefined, cmd.toOffset ?? 0);
+          crossfade(fromPlayer, toPlayer, cmd.duration);
         }
         break;
       }
