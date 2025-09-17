@@ -18,9 +18,16 @@ export async function createRoom(token: string): Promise<string> {
   return data.roomId;
 }
 
+export interface ParticipantSummary {
+  id: string;
+  role: Role;
+  connected: boolean;
+}
+
 export interface JoinResponse {
   participantId: string;
   turn: RTCIceServer[];
+  participants: ParticipantSummary[];
 }
 
 export async function joinRoom(
@@ -34,8 +41,16 @@ export async function joinRoom(
     body: JSON.stringify({ role }),
   });
   if (!res.ok) throw new Error('failed to join room');
-  const data = (await res.json()) as { participantId: string; turn: RTCIceServer };
-  return { participantId: data.participantId, turn: [data.turn] };
+  const data = (await res.json()) as {
+    participantId: string;
+    turn: RTCIceServer;
+    participants?: ParticipantSummary[];
+  };
+  return {
+    participantId: data.participantId,
+    turn: [data.turn],
+    participants: data.participants ?? [],
+  };
 }
 
 export async function leaveRoom(
@@ -48,4 +63,13 @@ export async function leaveRoom(
     headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
     body: JSON.stringify({ participantId }),
   });
+}
+
+export async function listParticipants(roomId: string, token: string): Promise<ParticipantSummary[]> {
+  const res = await fetch(`${BASE_URL}/rooms/${roomId}/participants`, {
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw new Error('failed to list participants');
+  const data = (await res.json()) as { participants?: ParticipantSummary[] };
+  return data.participants ?? [];
 }

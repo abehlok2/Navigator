@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ConnectionStatus from './features/session/ConnectionStatus';
 import { connectWithReconnection } from './features/webrtc/connection';
 import AssetDropZone from './features/ui/AssetDropZone';
@@ -12,10 +12,20 @@ import AuthForm from './features/auth/AuthForm';
 import { useAuthStore } from './state/auth';
 import { useSessionStore } from './state/session';
 import { Button } from './components/ui/button';
-import { createRoom, joinRoom, type Role } from './features/session/api';
+import {
+  createRoom,
+  joinRoom,
+  leaveRoom,
+  listParticipants,
+  type ParticipantSummary,
+  type Role,
+} from './features/session/api';
+import ListenerPanel from './features/ui/ListenerPanel';
 
 const isRole = (value: string | null): value is Role =>
   value === 'facilitator' || value === 'explorer' || value === 'listener';
+
+const formatRole = (value: Role): string => value.charAt(0).toUpperCase() + value.slice(1);
 
 export default function App() {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -31,10 +41,71 @@ export default function App() {
   const [roomId, setRoomId] = useState('');
   const [targetId, setTargetId] = useState('');
   const [participantId, setParticipantId] = useState<string | null>(null);
+  const [participants, setParticipants] = useState<ParticipantSummary[]>([]);
   const [connecting, setConnecting] = useState(false);
   const [creatingRoom, setCreatingRoom] = useState(false);
+  const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sessionRole = useSessionStore(state => state.role);
+  const isListenerSession = sessionRole === 'listener';
+  const isFacilitatorSession = sessionRole === 'facilitator';
+  const isExplorerSession = sessionRole === 'explorer';
+  const canCreateRoom = role === 'facilitator';
+
+  const availableTargets = useMemo(() => {
+    const others = participants.filter(p => p.id !== participantId);
+    if (!role) return others;
+    switch (role) {
+      case 'listener':
+        return others.filter(p => p.role === 'facilitator');
+      case 'explorer':
+        return others.filter(p => p.role === 'facilitator');
+      case 'facilitator':
+        return others.filter(p => p.role !== 'facilitator');
+      default:
+        return others;
+    }
+  }, [participants, participantId, role]);
+
+  useEffect(() => {
+    if (!availableTargets.length) {
+      if (targetId) setTargetId('');
+      return;
+    }
+    if (!availableTargets.some(p => p.id === targetId)) {
+      setTargetId(availableTargets[0].id);
+    }
+  }, [availableTargets, targetId]);
+
+  const loadParticipants = useCallback(async () => {
+    if (!token) {
+      setError('Authentication token is missing');
+      return;
+    }
+    if (!roomId) {
+      setError('Room ID is required to list participants');
+      return;
+    }
+    setLoadingParticipants(true);
+    setError(null);
+    try {
+      const list = await listParticipants(roomId, token);
+      setParticipants(list);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load participants');
+    } finally {
+      setLoadingParticipants(false);
+    }
+  }, [roomId, token]);
+
+  useEffect(() => {
+    if (!token) {
+      setParticipants([]);
+      setTargetId('');
+      setParticipantId(null);
+    }
+  }, [token]);
 
   const cleanupRemoteAudio = useCallback(() => {
     remoteStreamCleanups.current.forEach(cleanup => cleanup());
@@ -95,7 +166,12 @@ export default function App() {
       return;
     }
     if (!targetId) {
-      setError('Target participant ID is required');
+      setError('Select a participant to connect to');
+      return;
+    }
+    const selectedTarget = participants.find(p => p.id === targetId);
+    if (!selectedTarget) {
+      setError('Target participant is not available');
       return;
     }
     setConnecting(true);
@@ -105,14 +181,22 @@ export default function App() {
     cleanupRemoteAudio();
     try {
       const join = await joinRoom(roomId, role, token);
+      const remoteList = join.participants;
+      setParticipants(remoteList);
+      const resolvedTarget = remoteList.find(p => p.id === selectedTarget.id);
+      if (!resolvedTarget || resolvedTarget.id === join.participantId) {
+        await leaveRoom(roomId, join.participantId, token).catch(() => {});
+        throw new Error('target-unavailable');
+      }
       setParticipantId(join.participantId);
       const disconnect = connectWithReconnection({
         roomId,
         participantId: join.participantId,
-        targetId,
+        targetId: resolvedTarget.id,
         token,
         turn: join.turn,
         role,
+        targetRole: resolvedTarget.role,
         version: '1',
         onTrack: handleTrack,
       });
@@ -122,11 +206,23 @@ export default function App() {
       };
     } catch (err) {
       console.error(err);
-      setError('Failed to connect to room');
+      if (err instanceof Error && err.message === 'target-unavailable') {
+        setError('Selected participant is no longer available');
+      } else {
+        setError('Failed to connect to room');
+      }
     } finally {
       setConnecting(false);
     }
-  }, [cleanupRemoteAudio, handleTrack, roomId, role, targetId, token]);
+  }, [
+    cleanupRemoteAudio,
+    handleTrack,
+    participants,
+    roomId,
+    role,
+    targetId,
+    token,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -149,11 +245,17 @@ export default function App() {
       </div>
 
       <ConnectionStatus />
-      <AssetDropZone />
-      <AssetAvailability />
-      {sessionRole === 'facilitator' ? <FacilitatorControls /> : <RecordingControls />}
-      <TelemetryDisplay />
-      <div className="mt-4 flex flex-col gap-2">
+      {!isListenerSession && (
+        <>
+          <AssetDropZone />
+          <AssetAvailability />
+        </>
+      )}
+      {isFacilitatorSession && <FacilitatorControls />}
+      {isExplorerSession && <RecordingControls />}
+      {isListenerSession && <ListenerPanel />}
+      {!isListenerSession && <TelemetryDisplay />}
+      <div className="mt-4 flex flex-col gap-3">
         <div className="flex gap-2">
           <input
             type="text"
@@ -162,23 +264,64 @@ export default function App() {
             placeholder="Room ID"
             className="flex-1 rounded border border-gray-300 p-2"
           />
-          <Button type="button" onClick={handleCreateRoom} disabled={creatingRoom}>
+          <Button
+            type="button"
+            onClick={handleCreateRoom}
+            disabled={creatingRoom || !canCreateRoom}
+            title={canCreateRoom ? undefined : 'Only facilitators can create rooms'}
+          >
             {creatingRoom ? 'Creating…' : 'Create Room'}
           </Button>
         </div>
-        <input
-          type="text"
-          value={targetId}
-          onChange={e => setTargetId(e.target.value)}
-          placeholder="Target participant ID"
-          className="rounded border border-gray-300 p-2"
-        />
-        <div className="flex items-center gap-2">
-          <Button type="button" onClick={handleConnect} disabled={connecting}>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={targetId}
+            onChange={e => setTargetId(e.target.value)}
+            className="flex-1 min-w-[200px] rounded border border-gray-300 p-2"
+            disabled={availableTargets.length === 0}
+          >
+            <option value="">Select participant…</option>
+            {availableTargets.map(participant => (
+              <option key={participant.id} value={participant.id}>
+                {`${formatRole(participant.role)} — ${participant.id}`}
+              </option>
+            ))}
+          </select>
+          <Button
+            type="button"
+            onClick={loadParticipants}
+            disabled={loadingParticipants || !roomId}
+          >
+            {loadingParticipants ? 'Loading…' : 'Refresh Participants'}
+          </Button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" onClick={handleConnect} disabled={connecting || !targetId}>
             {connecting ? 'Connecting…' : 'Connect'}
           </Button>
           {participantId && <span>Participant ID: {participantId}</span>}
         </div>
+        {participants.length > 0 && (
+          <div className="rounded border border-gray-200 p-2 text-xs text-gray-600">
+            <div className="text-sm font-medium text-gray-800">Participants</div>
+            <ul className="mt-1 space-y-1">
+              {participants.map(participant => (
+                <li
+                  key={participant.id}
+                  className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium capitalize">{participant.role}</span>
+                    <span className="font-mono text-[11px] text-gray-500">{participant.id}</span>
+                  </div>
+                  <span className={participant.connected ? 'text-green-600' : 'text-gray-500'}>
+                    {participant.connected ? 'connected' : 'offline'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {error && <div className="text-sm text-red-600">{error}</div>}
       </div>
     </div>

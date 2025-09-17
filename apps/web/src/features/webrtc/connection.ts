@@ -12,6 +12,7 @@ export interface ConnectOptions {
   token: string;
   turn: RTCIceServer[];
   role: Role;
+  targetRole: Role;
   version: string;
   onTrack: (ev: RTCTrackEvent) => void;
   onDataChannel?: (dc: RTCDataChannel) => void;
@@ -27,6 +28,23 @@ export async function connect(
   const session = useSessionStore.getState();
   session.setRole(opts.role);
   session.setConnection('connecting');
+  if (opts.role === 'listener') {
+    session.setMicStream(null);
+  }
+
+  pc.addEventListener('connectionstatechange', () => {
+    if (pc.connectionState === 'connected') {
+      session.setConnection('connected');
+    } else if (pc.connectionState === 'connecting' || pc.connectionState === 'new') {
+      session.setConnection('connecting');
+    } else if (
+      pc.connectionState === 'disconnected' ||
+      pc.connectionState === 'failed' ||
+      pc.connectionState === 'closed'
+    ) {
+      session.setConnection('disconnected');
+    }
+  });
 
 
   const signalUrl =
@@ -86,7 +104,12 @@ export async function connect(
     });
   }
 
-  if (opts.role === 'facilitator') {
+  const shouldInitiateControlChannel =
+    opts.role === 'facilitator' && opts.targetRole !== 'listener';
+  const shouldReceiveControlChannel =
+    opts.role === 'explorer' && opts.targetRole === 'facilitator';
+
+  if (shouldInitiateControlChannel) {
     dataChannel = pc.createDataChannel('control', { ordered: true });
     control = new ControlChannel(dataChannel, {
       role: opts.role,
@@ -96,7 +119,7 @@ export async function connect(
     });
     setup(dataChannel, control);
     opts.onDataChannel?.(dataChannel);
-  } else if (opts.role === 'explorer') {
+  } else if (shouldReceiveControlChannel) {
     pc.ondatachannel = ev => {
       dataChannel = ev.channel;
       control = new ControlChannel(dataChannel!, {
@@ -129,7 +152,7 @@ export async function connect(
   ws.onmessage = async ev => {
     const msg = JSON.parse(ev.data);
     if (msg.type === 'sdp') {
-      if (msg.description.type === 'offer' && opts.role === 'explorer') {
+      if (msg.description.type === 'offer' && (opts.role === 'explorer' || opts.role === 'listener')) {
         await pc.setRemoteDescription(msg.description);
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
