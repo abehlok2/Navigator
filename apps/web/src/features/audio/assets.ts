@@ -70,29 +70,3 @@ export function removeBuffer(id: string) {
 export function hasBuffer(id: string): boolean {
   return buffers.has(id);
 }
-
-export async function loadRemoteAsset({
-  id,
-  source,
-  sha256,
-}: {
-  id: string;
-  source: string;
-  sha256?: string;
-}): Promise<{ buffer: AudioBuffer; bytes: number }> {
-  const response = await fetch(source);
-  if (!response.ok) {
-    throw new Error(`failed to fetch asset ${id}: ${response.status} ${response.statusText}`);
-  }
-  const array = await response.arrayBuffer();
-  if (sha256) {
-    const digest = await digestSha256(array.slice(0));
-    if (digest !== sha256.toLowerCase()) {
-      throw new Error(`sha256 mismatch for asset ${id}`);
-    }
-  }
-  const ctx = getAudioContext();
-  const buffer = await ctx.decodeAudioData(array.slice(0));
-  setBuffer(id, buffer);
-  return { buffer, bytes: array.byteLength };
-}

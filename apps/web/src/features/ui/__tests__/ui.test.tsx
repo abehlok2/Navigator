@@ -67,8 +67,7 @@ describe('UI components', () => {
     expect(screen.getByText('Soothing Tone')).toBeTruthy();
     expect(screen.getByText('ID: tone')).toBeTruthy();
     expect(screen.getByText('Use for intro segment')).toBeTruthy();
-    const sourceLink = screen.getByRole('link', { name: /Source/i });
-    expect(sourceLink.getAttribute('href')).toBe('https://example.com/tone.wav');
+    expect(screen.getByText(/Legacy remote reference/)).toBeTruthy();
     expect(screen.queryByText(/Explorer progress/)).toBeNull();
   });
 
@@ -212,22 +211,10 @@ describe('UI components', () => {
 
     render(<FacilitatorControls />);
 
-    const input = screen.getByPlaceholderText('https://example.com/path/to/audio.wav');
-    fireEvent.change(input, { target: { value: 'https://cdn.example/tone.wav' } });
-
     fireEvent.click(screen.getByRole('button', { name: 'Load' }));
 
-    expect(load).toHaveBeenCalled();
-
-    await waitFor(() => {
-      expect(load).toHaveBeenCalledWith({
-        id: 'tone',
-        source: 'https://cdn.example/tone.wav',
-        sha256: 'abc',
-        bytes: 1024,
-      });
-    });
-    expect(screen.getByText('Load command acknowledged.')).toBeTruthy();
+    expect(load).toHaveBeenCalledWith({ id: 'tone', sha256: 'abc', bytes: 1024 });
+    await screen.findByText('Load command acknowledged.');
   });
 
   it('issues unload command when explorer has asset', async () => {
@@ -298,16 +285,10 @@ describe('UI components', () => {
 
     render(<FacilitatorControls />);
 
-    const input = screen.getByPlaceholderText('https://example.com/path/to/audio.wav');
-    fireEvent.change(input, { target: { value: 'https://cdn.example/tone.wav' } });
-
     fireEvent.click(screen.getByRole('button', { name: 'Load' }));
 
     await screen.findByText('fetch failed');
-    expect(load).toHaveBeenCalled();
+    expect(load).toHaveBeenCalledWith({ id: 'tone', sha256: 'def', bytes: 2048 });
 
-    fireEvent.change(input, { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Load' }));
-    await screen.findByText('Provide a source URL before loading.');
   });
 });

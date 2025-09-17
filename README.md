@@ -88,6 +88,10 @@ VITE_API_URL=http://your-host:8080 \
 VITE_SIGNAL_URL=ws://your-host:8080 pnpm dev:web
 ```
 
+#### Audio asset preparation
+
+The web client only plays audio that has been supplied locally by the facilitator. Import assets through the manifest editor or drop zone after distributing the files to explorers (for example via USB drive or shared local storage). Remote URLs in manifests are treated as legacy metadata and are not fetched by the application.
+
 ### Signal server
 
 Run the signal server with live reloading:

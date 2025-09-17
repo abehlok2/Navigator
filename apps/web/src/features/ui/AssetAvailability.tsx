@@ -60,15 +60,8 @@ export default function AssetAvailability() {
                     <div className="mt-1 whitespace-pre-wrap text-xs text-gray-600">{trimmedNotes}</div>
                   )}
                   {trimmedUrl && (
-                    <div className="mt-1 text-xs">
-                      <a
-                        href={trimmedUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-blue-600 hover:underline"
-                      >
-                        Source
-                      </a>
+                    <div className="mt-1 break-all text-xs text-yellow-800">
+                      Legacy remote reference (not fetched automatically): {trimmedUrl}
                     </div>
                   )}
                 </div>
