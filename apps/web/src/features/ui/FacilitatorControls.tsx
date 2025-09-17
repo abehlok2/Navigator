@@ -1,6 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSessionStore } from '../../state/session';
 import ManifestEditor from './ManifestEditor';
+
+type EntryStatusPhase = 'idle' | 'loading' | 'unloading' | 'success' | 'error';
+
+interface EntryStatus {
+  phase: EntryStatusPhase;
+  message?: string;
+}
 
 export default function FacilitatorControls() {
   const { manifest, remoteAssets, remoteMissing, control } = useSessionStore(s => ({
@@ -15,9 +22,7 @@ export default function FacilitatorControls() {
   const remoteMissingSet = remoteMissing;
 
   const [sources, setSources] = useState<Record<string, string>>({});
-  const [status, setStatus] = useState<
-    Record<string, { phase: 'idle' | 'loading' | 'unloading' | 'success' | 'error'; message?: string }>
-  >({});
+  const [status, setStatus] = useState<Record<string, EntryStatus>>({});
 
   const [gain, setGain] = useState<Record<string, number>>({});
   const handlePlay = (id: string) => control?.play({ id }).catch(() => {});
@@ -75,60 +80,63 @@ export default function FacilitatorControls() {
     });
   }, [manifestEntries]);
 
-  const updateStatus = (
-    id: string,
-    next: { phase: 'idle' | 'loading' | 'unloading' | 'success' | 'error'; message?: string }
-  ) => {
+  const updateStatus = useCallback((id: string, next: EntryStatus) => {
     setStatus(prev => ({ ...prev, [id]: next }));
-  };
+  }, []);
 
-  const handleLoad = async (entryId: string, sha256?: string, bytes?: number) => {
-    const source = sources[entryId]?.trim();
-    if (!source) {
-      updateStatus(entryId, {
-        phase: 'error',
-        message: 'Provide a source URL before loading.',
-      });
-      return;
-    }
-    if (!control) {
-      updateStatus(entryId, {
-        phase: 'error',
-        message: 'Control channel is not connected.',
-      });
-      return;
-    }
-    updateStatus(entryId, { phase: 'loading', message: 'Sending load command…' });
-    try {
-      await control.load({ id: entryId, source, sha256, bytes });
-      updateStatus(entryId, { phase: 'success', message: 'Load command acknowledged.' });
-    } catch (err) {
-      updateStatus(entryId, {
-        phase: 'error',
-        message: (err as Error).message || 'Failed to load asset.',
-      });
-    }
-  };
+  const handleLoad = useCallback(
+    async (entryId: string, sha256?: string, bytes?: number) => {
+      const source = sources[entryId]?.trim();
+      if (!source) {
+        updateStatus(entryId, {
+          phase: 'error',
+          message: 'Provide a source URL before loading.',
+        });
+        return;
+      }
+      if (!control) {
+        updateStatus(entryId, {
+          phase: 'error',
+          message: 'Control channel is not connected.',
+        });
+        return;
+      }
+      updateStatus(entryId, { phase: 'loading', message: 'Sending load command…' });
+      try {
+        await control.load({ id: entryId, source, sha256, bytes });
+        updateStatus(entryId, { phase: 'success', message: 'Load command acknowledged.' });
+      } catch (err) {
+        updateStatus(entryId, {
+          phase: 'error',
+          message: (err as Error).message || 'Failed to load asset.',
+        });
+      }
+    },
+    [control, sources, updateStatus]
+  );
 
-  const handleUnload = async (entryId: string) => {
-    if (!control) {
-      updateStatus(entryId, {
-        phase: 'error',
-        message: 'Control channel is not connected.',
-      });
-      return;
-    }
-    updateStatus(entryId, { phase: 'unloading', message: 'Sending unload command…' });
-    try {
-      await control.unload({ id: entryId });
-      updateStatus(entryId, { phase: 'success', message: 'Unload command acknowledged.' });
-    } catch (err) {
-      updateStatus(entryId, {
-        phase: 'error',
-        message: (err as Error).message || 'Failed to unload asset.',
-      });
-    }
-  };
+  const handleUnload = useCallback(
+    async (entryId: string) => {
+      if (!control) {
+        updateStatus(entryId, {
+          phase: 'error',
+          message: 'Control channel is not connected.',
+        });
+        return;
+      }
+      updateStatus(entryId, { phase: 'unloading', message: 'Sending unload command…' });
+      try {
+        await control.unload({ id: entryId });
+        updateStatus(entryId, { phase: 'success', message: 'Unload command acknowledged.' });
+      } catch (err) {
+        updateStatus(entryId, {
+          phase: 'error',
+          message: (err as Error).message || 'Failed to unload asset.',
+        });
+      }
+    },
+    [control, updateStatus]
+  );
 
   const handleCrossfade = () => {
     const loaded = manifestEntries.filter(entry => remoteAssetSet.has(entry.id)).map(entry => entry.id);
