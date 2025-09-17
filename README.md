@@ -88,6 +88,13 @@ VITE_API_URL=http://your-host:8080 \
 VITE_SIGNAL_URL=ws://your-host:8080 pnpm dev:web
 ```
 
+### Audio asset workflow
+
+Navigator's audio playback system only uses facilitator-provided local files. Facilitators distribute the asset library and
+publish a manifest containing IDs, file sizes, and SHA-256 hashes. Explorers must preload the matching files—typically by
+dragging and dropping them into the web interface—before playback commands succeed. Remote URLs and arbitrary network fetches
+are intentionally unsupported to ensure sessions rely solely on trusted, locally sourced material.
+
 ### Signal server
 
 Run the signal server with live reloading:

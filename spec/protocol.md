@@ -70,7 +70,6 @@ interface CmdLoad {
   id: string;
   sha256?: string;
   bytes?: number;
-  source?: string; // URL or data URI to fetch/decode
 }
 
 interface CmdUnload { id: string; }

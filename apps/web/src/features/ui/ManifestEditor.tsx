@@ -3,8 +3,6 @@ import { getAudioContext } from '../audio/context';
 import { useSessionStore } from '../../state/session';
 import type { AssetManifest } from '../control/protocol';
 
-type SourceType = 'file' | 'url';
-
 function generateKey() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return (crypto as Crypto).randomUUID();
@@ -17,8 +15,7 @@ interface ManifestDraftEntry {
   id: string;
   title: string;
   notes: string;
-  sourceType: SourceType;
-  url?: string;
+  hasLocalFile: boolean;
   fileName?: string;
   mimeType?: string;
   sha256?: string;
@@ -72,7 +69,7 @@ function createDraftFromManifest(entries: AssetManifest['entries']): ManifestDra
     id: entry.id,
     title: entry.id,
     notes: '',
-    sourceType: 'url',
+    hasLocalFile: false,
     sha256: entry.sha256,
     bytes: entry.bytes,
   }));
@@ -120,6 +117,23 @@ export default function ManifestEditor() {
     fileInputRef.current?.click();
   };
 
+  const handleAddPlaceholder = () => {
+    const entry: ManifestDraftEntry = {
+      key: generateKey(),
+      id: '',
+      title: '',
+      notes: '',
+      hasLocalFile: false,
+      sha256: '',
+      bytes: undefined,
+      duration: undefined,
+    };
+    setErrors([]);
+    setSendError(null);
+    setSendSuccess(null);
+    setDraftEntries(current => [...current, entry]);
+  };
+
   const handleFilesSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
@@ -141,7 +155,7 @@ export default function ManifestEditor() {
           id: file.name,
           title: file.name,
           notes: '',
-          sourceType: 'file',
+          hasLocalFile: true,
           fileName: file.name,
           mimeType: file.type || undefined,
           sha256,
@@ -161,24 +175,6 @@ export default function ManifestEditor() {
       setErrors([]);
     }
     event.target.value = '';
-  };
-
-  const handleAddUrl = () => {
-    const entry: ManifestDraftEntry = {
-      key: generateKey(),
-      id: '',
-      title: '',
-      notes: '',
-      sourceType: 'url',
-      url: '',
-      sha256: '',
-      bytes: undefined,
-      duration: undefined,
-    };
-    setErrors([]);
-    setSendError(null);
-    setSendSuccess(null);
-    setDraftEntries(current => [...current, entry]);
   };
 
   const updateEntry = (key: string, update: Partial<ManifestDraftEntry>) => {
@@ -247,14 +243,6 @@ export default function ManifestEditor() {
       if (typeof entry.bytes !== 'number' || entry.bytes <= 0) {
         problems.push(`${label}: File size (bytes) must be provided.`);
       }
-      if (entry.sourceType === 'url') {
-        const hasUrl = !!entry.url && entry.url.trim().length > 0;
-        const hasNotes = entry.notes.trim().length > 0;
-        if (!hasUrl && !hasNotes) {
-          problems.push(`${label}: Provide a source URL or notes about where to retrieve the asset.`);
-        }
-      }
-
       if (typeof entry.duration === 'number' && entry.duration <= 0) {
         problems.push(`${label}: Duration must be a positive number if provided.`);
       }
@@ -294,8 +282,8 @@ export default function ManifestEditor() {
           <button type="button" onClick={handleAddFiles} className="rounded border border-gray-300 px-2 py-1">
             Add Files
           </button>
-          <button type="button" onClick={handleAddUrl} className="rounded border border-gray-300 px-2 py-1">
-            Add URL
+          <button type="button" onClick={handleAddPlaceholder} className="rounded border border-gray-300 px-2 py-1">
+            Add Placeholder
           </button>
           <button type="button" onClick={handleResetToSession} className="rounded border border-gray-300 px-2 py-1">
             Load Current
@@ -360,22 +348,15 @@ export default function ManifestEditor() {
                 </label>
               </div>
               <div className="mt-3 grid gap-2 md:grid-cols-2">
-                {entry.sourceType === 'file' ? (
+                {entry.hasLocalFile ? (
                   <div className="text-sm text-gray-700">
                     <div><span className="font-medium">File:</span> {entry.fileName}</div>
                     <div><span className="font-medium">Type:</span> {entry.mimeType || 'unknown'}</div>
                   </div>
                 ) : (
-                  <label className="flex flex-col text-sm md:col-span-2">
-                    <span className="mb-1 font-medium">Source URL</span>
-                    <input
-                      type="url"
-                      value={entry.url || ''}
-                      placeholder="https://example.com/path/to/audio.mp3"
-                      onChange={e => updateEntry(entry.key, { url: e.target.value })}
-                      className="rounded border border-gray-300 p-2"
-                    />
-                  </label>
+                  <div className="text-sm text-gray-600 md:col-span-2">
+                    Provide checksum, file size, and notes for the facilitator-distributed audio file.
+                  </div>
                 )}
                 <label className="flex flex-col text-sm">
                   <span className="mb-1 font-medium">SHA-256</span>
@@ -384,7 +365,7 @@ export default function ManifestEditor() {
                     value={entry.sha256 || ''}
                     onChange={e => updateEntry(entry.key, { sha256: e.target.value.trim().toLowerCase() })}
                     className="rounded border border-gray-300 p-2"
-                    readOnly={entry.sourceType === 'file'}
+                    readOnly={entry.hasLocalFile}
                   />
                 </label>
                 <label className="flex flex-col text-sm">
@@ -394,10 +375,10 @@ export default function ManifestEditor() {
                     value={entry.bytes ?? ''}
                     onChange={e => updateEntry(entry.key, { bytes: e.target.value ? Number(e.target.value) : undefined })}
                     className="rounded border border-gray-300 p-2"
-                    readOnly={entry.sourceType === 'file'}
+                    readOnly={entry.hasLocalFile}
                   />
                 </label>
-                {entry.sourceType === 'url' ? (
+                {!entry.hasLocalFile ? (
                   <label className="flex flex-col text-sm">
                     <span className="mb-1 font-medium">Estimated Duration (seconds)</span>
                     <input
@@ -424,9 +405,9 @@ export default function ManifestEditor() {
             </li>
           ))}
         </ul>
-      ) : (
-        <div className="mt-4 text-sm text-gray-600">No manifest entries yet. Add files or URLs to begin.</div>
-      )}
+        ) : (
+          <div className="mt-4 text-sm text-gray-600">No manifest entries yet. Add files or placeholders to begin.</div>
+        )}
       {errors.length > 0 && (
         <div className="mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           <ul className="list-disc pl-5">

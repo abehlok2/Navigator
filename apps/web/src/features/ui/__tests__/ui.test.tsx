@@ -200,9 +200,6 @@ describe('UI components', () => {
 
     render(<FacilitatorControls />);
 
-    const input = screen.getByPlaceholderText('https://example.com/path/to/audio.wav');
-    fireEvent.change(input, { target: { value: 'https://cdn.example/tone.wav' } });
-
     fireEvent.click(screen.getByRole('button', { name: 'Load' }));
 
     expect(load).toHaveBeenCalled();
@@ -210,7 +207,6 @@ describe('UI components', () => {
     await waitFor(() => {
       expect(load).toHaveBeenCalledWith({
         id: 'tone',
-        source: 'https://cdn.example/tone.wav',
         sha256: 'abc',
         bytes: 1024,
       });
@@ -286,16 +282,9 @@ describe('UI components', () => {
 
     render(<FacilitatorControls />);
 
-    const input = screen.getByPlaceholderText('https://example.com/path/to/audio.wav');
-    fireEvent.change(input, { target: { value: 'https://cdn.example/tone.wav' } });
-
     fireEvent.click(screen.getByRole('button', { name: 'Load' }));
 
     await screen.findByText('fetch failed');
     expect(load).toHaveBeenCalled();
-
-    fireEvent.change(input, { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Load' }));
-    await screen.findByText('Provide a source URL before loading.');
   });
 });

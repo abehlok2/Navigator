@@ -50,7 +50,6 @@ export const cmdLoadSchema = z.object({
   id: z.string(),
   sha256: z.string().optional(),
   bytes: z.number().optional(),
-  source: z.string().optional(),
 });
 export type CmdLoad = z.infer<typeof cmdLoadSchema>;
 
