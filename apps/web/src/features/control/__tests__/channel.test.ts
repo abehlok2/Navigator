@@ -192,7 +192,9 @@ describe('ControlChannel message handling', () => {
   it('crossfades without restarting an active source', async () => {
     const existingFrom = { isPlaying: vi.fn(() => true) };
     const toPlayer = {};
-    const playAt = vi.fn(() => toPlayer);
+    const playAt = vi.fn<[string, unknown, number | undefined, number | undefined], typeof toPlayer>(
+      () => toPlayer
+    );
     const crossfade = vi.fn();
     const getPlayer = vi.fn(() => existingFrom as any);
 
@@ -240,7 +242,7 @@ describe('ControlChannel message handling', () => {
     expect(getPlayer).toHaveBeenCalledWith('a');
     expect(existingFrom.isPlaying).toHaveBeenCalled();
     expect(playAt).toHaveBeenCalledTimes(1);
-    const [idArg, clockArg, atArg, offsetArg] = playAt.mock.calls[0];
+    const [idArg, clockArg, atArg, offsetArg] = playAt.mock.calls[0]!;
     expect(idArg).toBe('b');
     expect(clockArg).toBe(useSessionStore.getState().peerClock);
     expect(atArg).toBeUndefined();

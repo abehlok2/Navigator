@@ -126,7 +126,11 @@ app.post('/rooms/:roomId/join', authMiddleware(), (req, res) => {
       return;
     }
     const participant = addParticipant(req.params.roomId, role);
-    const participants = listParticipants(req.params.roomId).map(p => ({ id: p.id, role: p.role }));
+    const participants = listParticipants(req.params.roomId).map(p => ({
+      id: p.id,
+      role: p.role,
+      connected: Boolean(p.ws),
+    }));
     res.json({ participantId: participant.id, turn: TURN_CONFIG, participants });
   } catch {
     res.status(400).json({ error: 'invalid request or room not found' });

@@ -155,6 +155,7 @@ describe('connectWithReconnection', () => {
       token: 'secret-token',
       turn: [{ urls: ['stun:example.org'] }],
       role: 'facilitator',
+      targetRole: 'explorer',
       version: '1.0.0',
       onTrack: vi.fn(),
     });
@@ -219,6 +220,7 @@ describe('connectWithReconnection', () => {
       token: 'listener-token',
       turn: [],
       role: 'listener',
+      targetRole: 'facilitator',
       version: '1.0.0',
       onTrack: trackHandler,
     });
