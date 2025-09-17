@@ -104,14 +104,14 @@ describe('UI components', () => {
     useSessionStore.setState({
       manifest: {
         tone: { id: 'tone', sha256: 'hash1', bytes: 1024 },
-        noise: { id: 'noise', sha256: 'hash2', bytes: 2048 },
+        chime: { id: 'chime', sha256: 'hash2', bytes: 2048 },
       },
       assets: new Set(['tone']),
     });
 
     render(<AssetDropZone />);
 
-    const instructions = screen.getByText('Drop audio files matching: tone, noise');
+    const instructions = screen.getByText('Drop audio files matching: tone, chime');
     expect(instructions).toBeTruthy();
     expect(screen.getByText(/Loaded 1 \/ 2/)).toBeTruthy();
 

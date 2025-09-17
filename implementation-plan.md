@@ -6,7 +6,7 @@ Two roles: Facilitator and Explorer.
 
 Voice chat (full-duplex, low latency) via WebRTC.
 
-Remote control of local program audio on the Explorer (playlists, play/pause/seek, fades, levels, binaural generators, noise beds).
+Remote control of local program audio on the Explorer (playlists, play/pause/seek, fades, levels).
 
 Self-hosted signaling + TURN. No third-party SaaS.
 
@@ -130,7 +130,6 @@ Maintain EMA of offset, stddev; expose "peerClock.now()" helper.
 type AssetManifest = {
   assets: Array<{
     id: string;                 // "theta_intro_001"
-    kind: "file" | "generator"; // "file" for audio files, "generator" for binaural/noise
     sha256?: string;            // optional integrity check
     meta?: { duration?: number; sampleRate?: number; loop?: boolean };
   }>;
@@ -139,24 +138,17 @@ type AssetManifest = {
 // Explorer replies with which ids it can satisfy locally (preloaded by user)
 type AssetPresence = {
   have: string[];               // asset ids available in browser memory/FS
-  missing: string[];            // not present; could be pushed or replaced by generators
+  missing: string[];            // not present; may be pushed from facilitator if permitted
 };
 
 3.5 Commands (Explorer executes)
-type CmdLoad = { id: string; mode: "fromLocal" | "fromURL" | "generator"; url?: string; gen?: GenSpec };
+type CmdLoad = { id: string; mode: "fromLocal" | "fromURL"; url?: string };
 type CmdUnload = { id: string };
 type CmdPlay = { id: string; atPeerTime?: number; offset?: number; gainDb?: number };
 type CmdStop = { id: string; atPeerTime?: number };
 type CmdSeek = { id: string; position: number };
 type CmdGain = { id?: string; bus?: string; targetDb: number; rampMs: number };
 type CmdCrossfade = { fromId: string; toId: string; durationMs: number; align?: "beat" | "now" };
-
-// Generators (binaural/noise) spec
-type GenSpec = {
-  type: "binaural" | "noise";
-  binaural?: { carrierHz: number; beatHz: number; depthDb?: number };
-  noise?: { color: "white" | "pink" | "brown"; bandwidthHz?: [number, number] };
-};
 
 // Ducking control (Explorer applies based on Facilitator voice level)
 type CmdDucking = { enabled: boolean; amountDb: number; attackMs: number; releaseMs: number; thresholdDb: number };
@@ -275,7 +267,7 @@ Expose peerClock.now() and getOffsetStats().
 
 engine/AudioEngine.ts
 
-Singleton per Explorer session: manages AudioContext, Destination, mixers (buses), and registries of Players (file and generator).
+Singleton per Explorer session: manages AudioContext, Destination, mixers (buses), and registry of file-based Players.
 
 Provides load(id, source), unload(id), play({id, atPeerTime, offset, gainDb}), stop({id, atPeerTime}), seek({id, position}), setGain({id|bus, targetDb, rampMs}), crossfade({fromId,toId,durationMs}).
 
@@ -287,18 +279,6 @@ engine/players/FilePlayer.ts
 
 Holds decoded AudioBuffer, constructs AudioBufferSourceNode on play, connects to per-track GainNode, supports start(when, offset), stop(when), linearRampToValueAtTime.
 
-engine/players/BinauralPlayer.ts
-
-Two OscillatorNodes (L/R) → GainNodes → channel merger → main bus.
-
-Set frequency.value = carrierHz ± beatHz/2 (or keep same carrier and modulate with StereoPannerNode — simpler approach is detuned left/right).
-
-Depth via amplitude modulation or channel gains; expose live param updates.
-
-engine/players/NoisePlayer.ts
-
-Use AudioWorklet (preferred) or ScriptProcessor fallback to generate noise; optional biquad filters to color (pink/brown). Connect to bus.
-
 engine/ducking/VoiceRMS.ts
 
 MediaStreamAudioSourceNode from remote facilitator voice.
@@ -309,7 +289,7 @@ Emits events or updates shared store; AudioEngine reads and applies gain reducti
 
 assets/AssetStore.ts
 
-Keeps map {id -> {type: "file"|"generator", buffer?:AudioBuffer, genSpec?:GenSpec, meta}}.
+Keeps map {id -> {buffer?:AudioBuffer, meta}}.
 
 ingestFiles(FileList) to preload local assets (Explorer UI).
 
@@ -329,11 +309,9 @@ Device setup: select mic and output device; test tone; VU meters.
 
 Facilitator view:
 
-Playlist table (rows: id, type, duration, status(have/missing)).
+Playlist table (rows: id, duration, status(have/missing)).
 
 Transport: Play/Stop/Seek, Crossfade, Gain, Ducking toggles/params.
-
-Binaural/noise generators editor + “Add as track” button.
 
 Remote meters: Explorer program bus RMS/peak.
 
@@ -420,7 +398,7 @@ Facilitator provides an Asset Manifest (ids and metadata) to Explorer.
 
 Explorer preloads matching local files (drag-drop). They are decoded into AudioBuffers and registered under the requested ids.
 
-Missing assets may be replaced with generators (binaural/noise) or, optionally, fetched from a self-hosted URL if permitted.
+Missing assets may optionally be fetched from a self-hosted URL if permitted, otherwise they remain unavailable until provided locally.
 
 Optional small-file push (post-MVP)
 
@@ -514,8 +492,6 @@ AudioContext + master bus (GainNode).
 Program bus GainNode (for ducking).
 
 Implement FilePlayer with decodeAudioData and AudioBufferSourceNode.
-
-Implement generators: BinauralPlayer (two oscillators), NoisePlayer (AudioWorklet).
 
 Implement command handlers:
 
@@ -718,7 +694,7 @@ Failure states:
 
 Replace JSON with protobuf (smaller, faster) once stable.
 
-Add automation lanes (binaural beat ramps, envelopes) as high-level cmd.automate.
+Add automation lanes for gain and crossfade envelopes as high-level cmd.automate.
 
 Add observer role later via an SFU (mediasoup/Jitsi) if you need multi-party.
 
