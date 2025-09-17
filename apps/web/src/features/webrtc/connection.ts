@@ -167,6 +167,42 @@ export async function connect(
       } else if (msg.description.type === 'answer' && opts.role === 'facilitator') {
         await pc.setRemoteDescription(msg.description);
       }
+    } else if (msg.type === 'credentials') {
+      const payload = Array.isArray(msg.payload) ? msg.payload : [msg.payload];
+      const iceServers: RTCIceServer[] = [];
+
+      for (const raw of payload) {
+        if (!raw || typeof raw !== 'object') {
+          continue;
+        }
+
+        const urlsValue = (raw as { urls?: unknown }).urls;
+        const urls = Array.isArray(urlsValue)
+          ? urlsValue
+          : typeof urlsValue === 'string'
+          ? [urlsValue]
+          : [];
+        const normalizedUrls = urls.filter((url): url is string => typeof url === 'string' && url.length > 0);
+        if (!normalizedUrls.length) {
+          continue;
+        }
+
+        const server: RTCIceServer = { urls: normalizedUrls };
+        const username = (raw as { username?: unknown }).username;
+        const credential = (raw as { credential?: unknown }).credential;
+        if (typeof username === 'string') {
+          server.username = username;
+        }
+        if (typeof credential === 'string') {
+          server.credential = credential;
+        }
+        iceServers.push(server);
+      }
+
+      if (iceServers.length) {
+        opts.turn = iceServers;
+        pc.setConfiguration({ iceServers });
+      }
     } else if (msg.type === 'ice' && msg.candidate) {
       await pc.addIceCandidate(msg.candidate);
     }
