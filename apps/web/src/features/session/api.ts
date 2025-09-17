@@ -1,6 +1,6 @@
-export type Role = 'facilitator' | 'explorer' | 'listener';
+import { apiUrl } from '../../config';
 
-const BASE_URL = 'http://localhost:8080';
+export type Role = 'facilitator' | 'explorer' | 'listener';
 
 function authHeaders(token: string): HeadersInit {
   return {
@@ -9,7 +9,7 @@ function authHeaders(token: string): HeadersInit {
 }
 
 export async function createRoom(token: string): Promise<string> {
-  const res = await fetch(`${BASE_URL}/rooms`, {
+  const res = await fetch(apiUrl('/rooms'), {
     method: 'POST',
     headers: authHeaders(token),
   });
@@ -35,7 +35,7 @@ export async function joinRoom(
   role: Role,
   token: string
 ): Promise<JoinResponse> {
-  const res = await fetch(`${BASE_URL}/rooms/${roomId}/join`, {
+  const res = await fetch(apiUrl(`/rooms/${roomId}/join`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
     body: JSON.stringify({ role }),
@@ -58,7 +58,7 @@ export async function leaveRoom(
   participantId: string,
   token: string
 ): Promise<void> {
-  await fetch(`${BASE_URL}/rooms/${roomId}/leave`, {
+  await fetch(apiUrl(`/rooms/${roomId}/leave`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
     body: JSON.stringify({ participantId }),
@@ -66,7 +66,7 @@ export async function leaveRoom(
 }
 
 export async function listParticipants(roomId: string, token: string): Promise<ParticipantSummary[]> {
-  const res = await fetch(`${BASE_URL}/rooms/${roomId}/participants`, {
+  const res = await fetch(apiUrl(`/rooms/${roomId}/participants`), {
     headers: authHeaders(token),
   });
   if (!res.ok) throw new Error('failed to list participants');
