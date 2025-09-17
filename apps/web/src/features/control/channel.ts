@@ -52,6 +52,7 @@ export class ControlChannel {
   private opts: ControlChannelOptions;
   private pending = new Map<string, Pending>();
   private duckingConfig: CmdDucking | null = null;
+  private lastManifest: AssetManifest['entries'] | null = null;
 
   constructor(dc: RTCDataChannel, opts: ControlChannelOptions) {
     this.dc = dc;
@@ -92,7 +93,9 @@ export class ControlChannel {
       role: this.opts.role,
       roomId: this.opts.roomId,
       version: this.opts.version,
-    }).catch(err => this.opts.onError?.(err.message));
+    })
+      .then(() => this.resendManifestIfNeeded())
+      .catch(err => this.opts.onError?.(err.message));
   }
 
   private onMessage(ev: MessageEvent) {
@@ -224,6 +227,16 @@ export class ControlChannel {
     }
   }
 
+  private async resendManifestIfNeeded() {
+    if (this.opts.role !== 'facilitator') return;
+    if (this.lastManifest === null) return;
+    try {
+      await this.send('asset.manifest', { entries: this.lastManifest });
+    } catch (err) {
+      this.opts.onError?.((err as Error).message);
+    }
+  }
+
   private sendAck(txn: string | undefined, ok: boolean, error?: string) {
     if (!txn) return;
     const ackMsg: WireMessage = {
@@ -273,6 +286,7 @@ export class ControlChannel {
   }
 
   setManifest(entries: AssetManifest['entries']) {
+    this.lastManifest = entries.map(entry => ({ ...entry }));
     return this.send('asset.manifest', { entries });
   }
 
