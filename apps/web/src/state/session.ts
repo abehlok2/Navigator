@@ -35,6 +35,7 @@ interface SessionState {
   addAsset: (id: string, opts?: { broadcast?: boolean }) => void;
   removeAsset: (id: string, opts?: { broadcast?: boolean }) => void;
   updateRemotePresence: (presence: AssetPresence) => void;
+  resetRemotePresence: () => void;
   setTelemetry: (t: TelemetryLevels | null) => void;
   setHeartbeat: () => void;
   setMicStream: (stream: MediaStream | null) => void;
@@ -155,6 +156,14 @@ export const useSessionStore = create<SessionState>(set => ({
           remoteMissing.add(id);
         });
       return { remoteAssets, remoteMissing };
+    }),
+  resetRemotePresence: () =>
+    set(state => {
+      const ids = Object.keys(state.manifest);
+      return {
+        remoteAssets: new Set(),
+        remoteMissing: new Set(ids),
+      };
     }),
   setTelemetry: t => set({ telemetry: t }),
   setHeartbeat: () => set({ lastHeartbeat: Date.now() }),
