@@ -33,6 +33,9 @@ class FakeRTCPeerConnection {
     this.localDescription = desc;
   });
   public setRemoteDescription = vi.fn(async () => {});
+  public setConfiguration = vi.fn((config: unknown) => {
+    this.config = config;
+  });
   public close = vi.fn();
   public config: unknown;
 
@@ -170,6 +173,103 @@ describe('connectWithReconnection', () => {
     expect(peerInstances[0].config).toEqual({ iceServers: [{ urls: ['stun:example.org'] }] });
 
     stop();
+  });
+
+  it('refreshes ICE servers when credentials message is received', async () => {
+    const sessionState = {
+      manifest: {},
+      assets: new Set<string>(),
+      setRole: vi.fn(),
+      setConnection: vi.fn(),
+      setControl: vi.fn(),
+      setPeerClock: vi.fn(),
+      setTelemetry: vi.fn(),
+      setHeartbeat: vi.fn(),
+      setMicStream: vi.fn(),
+    };
+
+    vi.doMock('../../state/session', () => ({
+      useSessionStore: {
+        getState: () => sessionState,
+      },
+    }));
+
+    const controlCtor = vi.fn().mockImplementation(() => ({
+      send: vi.fn(),
+      setMicStream: vi.fn(),
+      ducking: vi.fn(),
+      play: vi.fn(),
+      stop: vi.fn(),
+      crossfade: vi.fn(),
+      setGain: vi.fn(),
+    }));
+
+    vi.doMock('../control/channel', () => ({ ControlChannel: controlCtor }));
+    vi.doMock('../audio/telemetry', () => ({ startTelemetry: vi.fn(() => vi.fn()) }));
+    vi.doMock('../audio/peerClock', () => ({ PeerClock: vi.fn(function (this: any) { this.stop = vi.fn(); }) }));
+    vi.doMock('../audio/scheduler', () => ({ watchClock: vi.fn() }));
+
+    vi.stubGlobal('RTCPeerConnection', FakeRTCPeerConnection as unknown as typeof RTCPeerConnection);
+    vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket);
+
+    const getUserMedia = vi.fn().mockResolvedValue({
+      getTracks: () => [{ stop: vi.fn() }],
+    });
+    (globalThis as any).navigator = { mediaDevices: { getUserMedia } };
+
+    const { connect } = await import('../connection');
+
+    const { pc } = await connect({
+      roomId: 'room1',
+      participantId: 'p1',
+      targetId: 'p2',
+      token: 'secret-token',
+      turn: [{ urls: ['stun:initial.example.org'] }],
+      role: 'listener',
+      targetRole: 'facilitator',
+      version: '1.0.0',
+      onTrack: vi.fn(),
+    });
+
+    expect(peerInstances).toHaveLength(1);
+    expect(websocketInstances).toHaveLength(1);
+
+    const peer = peerInstances[0];
+    const ws = websocketInstances[0];
+
+    expect(typeof ws.onmessage).toBe('function');
+
+    await ws.onmessage?.({
+      data: JSON.stringify({
+        type: 'credentials',
+        payload: {
+          urls: ['turn:relay.example.org?transport=udp'],
+          username: 'relay-user',
+          credential: 'relay-pass',
+        },
+      }),
+    } as any);
+
+    expect(peer.setConfiguration).toHaveBeenCalledWith({
+      iceServers: [
+        {
+          urls: ['turn:relay.example.org?transport=udp'],
+          username: 'relay-user',
+          credential: 'relay-pass',
+        },
+      ],
+    });
+    expect(peer.config).toEqual({
+      iceServers: [
+        {
+          urls: ['turn:relay.example.org?transport=udp'],
+          username: 'relay-user',
+          credential: 'relay-pass',
+        },
+      ],
+    });
+
+    pc.close();
   });
 
   it('propagates remote track events to the provided handler', async () => {
