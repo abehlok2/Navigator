@@ -70,9 +70,10 @@ function createDraftFromManifest(entries: AssetManifest['entries']): ManifestDra
   return entries.map(entry => ({
     key: generateKey(),
     id: entry.id,
-    title: entry.id,
-    notes: '',
+    title: typeof entry.title === 'string' ? entry.title : entry.id,
+    notes: typeof entry.notes === 'string' ? entry.notes : '',
     sourceType: 'url',
+    url: entry.url,
     sha256: entry.sha256,
     bytes: entry.bytes,
   }));
@@ -260,7 +261,17 @@ export default function ManifestEditor() {
       }
 
       if (trimmedId && entry.sha256 && shaPattern.test(entry.sha256) && typeof entry.bytes === 'number' && entry.bytes > 0) {
-        entries.push({ id: trimmedId, sha256: entry.sha256.toLowerCase(), bytes: entry.bytes });
+        const normalizedTitle = entry.title.trim();
+        const normalizedNotes = entry.notes.trim();
+        const normalizedUrl = entry.url?.trim() ?? '';
+        entries.push({
+          id: trimmedId,
+          sha256: entry.sha256.toLowerCase(),
+          bytes: entry.bytes,
+          ...(normalizedTitle ? { title: normalizedTitle } : {}),
+          ...(normalizedNotes ? { notes: normalizedNotes } : {}),
+          ...(normalizedUrl ? { url: normalizedUrl } : {}),
+        });
       }
     });
 
