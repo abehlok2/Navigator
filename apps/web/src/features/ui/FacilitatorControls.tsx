@@ -1,12 +1,23 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useSessionStore } from '../../state/session';
 import ManifestEditor from './ManifestEditor';
 
 export default function FacilitatorControls() {
-  const { assets, control } = useSessionStore(s => ({
-    assets: Array.from(s.remoteAssets),
+  const { manifest, remoteAssets, remoteMissing, control } = useSessionStore(s => ({
+    manifest: s.manifest,
+    remoteAssets: s.remoteAssets,
+    remoteMissing: s.remoteMissing,
     control: s.control,
   }));
+
+  const manifestEntries = useMemo(() => Object.values(manifest), [manifest]);
+  const remoteAssetSet = remoteAssets;
+  const remoteMissingSet = remoteMissing;
+
+  const [sources, setSources] = useState<Record<string, string>>({});
+  const [status, setStatus] = useState<
+    Record<string, { phase: 'idle' | 'loading' | 'unloading' | 'success' | 'error'; message?: string }>
+  >({});
 
   const [gain, setGain] = useState<Record<string, number>>({});
   const handlePlay = (id: string) => control?.play({ id }).catch(() => {});
@@ -16,9 +27,113 @@ export default function FacilitatorControls() {
     control?.setGain({ id, gainDb: value }).catch(() => {});
   };
 
+  useEffect(() => {
+    setStatus(prev => {
+      let changed = false;
+      const next: typeof prev = { ...prev };
+      manifestEntries.forEach(entry => {
+        const current = prev[entry.id];
+        if (!current) return;
+        if (current.phase === 'loading' && remoteAssetSet.has(entry.id)) {
+          next[entry.id] = {
+            phase: 'success',
+            message: 'Explorer reports asset loaded.',
+          };
+          changed = true;
+        }
+        if (current.phase === 'unloading' && !remoteAssetSet.has(entry.id)) {
+          next[entry.id] = {
+            phase: 'success',
+            message: 'Explorer reports asset unloaded.',
+          };
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [manifestEntries, remoteAssets]);
+
+  useEffect(() => {
+    const validIds = new Set(manifestEntries.map(entry => entry.id));
+    setStatus(prev => {
+      const hasInvalid = Object.keys(prev).some(id => !validIds.has(id));
+      if (!hasInvalid) return prev;
+      const next: typeof prev = {};
+      manifestEntries.forEach(entry => {
+        if (prev[entry.id]) {
+          next[entry.id] = prev[entry.id];
+        }
+      });
+      return next;
+    });
+    setSources(prev => {
+      const entries = Object.entries(prev).filter(([id]) => validIds.has(id));
+      if (entries.length === Object.keys(prev).length) {
+        return prev;
+      }
+      return Object.fromEntries(entries);
+    });
+  }, [manifestEntries]);
+
+  const updateStatus = (
+    id: string,
+    next: { phase: 'idle' | 'loading' | 'unloading' | 'success' | 'error'; message?: string }
+  ) => {
+    setStatus(prev => ({ ...prev, [id]: next }));
+  };
+
+  const handleLoad = async (entryId: string, sha256?: string, bytes?: number) => {
+    const source = sources[entryId]?.trim();
+    if (!source) {
+      updateStatus(entryId, {
+        phase: 'error',
+        message: 'Provide a source URL before loading.',
+      });
+      return;
+    }
+    if (!control) {
+      updateStatus(entryId, {
+        phase: 'error',
+        message: 'Control channel is not connected.',
+      });
+      return;
+    }
+    updateStatus(entryId, { phase: 'loading', message: 'Sending load command…' });
+    try {
+      await control.load({ id: entryId, source, sha256, bytes });
+      updateStatus(entryId, { phase: 'success', message: 'Load command acknowledged.' });
+    } catch (err) {
+      updateStatus(entryId, {
+        phase: 'error',
+        message: (err as Error).message || 'Failed to load asset.',
+      });
+    }
+  };
+
+  const handleUnload = async (entryId: string) => {
+    if (!control) {
+      updateStatus(entryId, {
+        phase: 'error',
+        message: 'Control channel is not connected.',
+      });
+      return;
+    }
+    updateStatus(entryId, { phase: 'unloading', message: 'Sending unload command…' });
+    try {
+      await control.unload({ id: entryId });
+      updateStatus(entryId, { phase: 'success', message: 'Unload command acknowledged.' });
+    } catch (err) {
+      updateStatus(entryId, {
+        phase: 'error',
+        message: (err as Error).message || 'Failed to unload asset.',
+      });
+    }
+  };
+
   const handleCrossfade = () => {
-    if (assets.length >= 2) {
-      control?.crossfade({ fromId: assets[0], toId: assets[1], duration: 2 }).catch(() => {});
+    const loaded = manifestEntries.filter(entry => remoteAssetSet.has(entry.id)).map(entry => entry.id);
+    if (loaded.length >= 2) {
+      control?.crossfade({ fromId: loaded[0], toId: loaded[1], duration: 2 }).catch(() => {});
     }
   };
 
@@ -64,30 +179,104 @@ export default function FacilitatorControls() {
     <div className="section space-y-4">
       <h2>Facilitator Controls</h2>
       <ManifestEditor />
-      <ul>
-        {assets.map(id => (
-          <li key={id} style={{ marginBottom: '0.5rem' }}>
-            {id}
-            <button onClick={() => handlePlay(id)} style={{ marginLeft: '0.5rem' }}>
-              Play
-            </button>
-            <button onClick={() => handleStop(id)} style={{ marginLeft: '0.5rem' }}>
-              Stop
-            </button>
-            <input
-              type="range"
-              min={-60}
-              max={6}
-              step={1}
-              value={gain[id] ?? 0}
-              onChange={e => handleGain(id, Number(e.target.value))}
-              style={{ marginLeft: '0.5rem' }}
-            />
-            <span style={{ marginLeft: '0.25rem' }}>{(gain[id] ?? 0).toFixed(0)} dB</span>
-          </li>
-        ))}
+      <ul className="space-y-4">
+        {manifestEntries.map(entry => {
+          const id = entry.id;
+          const sourceValue = sources[id] ?? '';
+          const entryStatus = status[id];
+          const canLoad = !remoteAssetSet.has(id) && entryStatus?.phase !== 'loading';
+          const canUnload = remoteAssetSet.has(id) && entryStatus?.phase !== 'unloading';
+          const explorerStatus = remoteAssetSet.has(id)
+            ? 'Explorer: Loaded'
+            : remoteMissingSet.has(id)
+              ? 'Explorer: Missing'
+              : 'Explorer: Unknown';
+          const statusClass = (() => {
+            switch (entryStatus?.phase) {
+              case 'loading':
+              case 'unloading':
+                return 'text-xs text-blue-600';
+              case 'success':
+                return 'text-xs text-green-600';
+              case 'error':
+                return 'text-xs text-red-600';
+              default:
+                return 'text-xs text-gray-500';
+            }
+          })();
+          return (
+            <li key={id} className="rounded border border-gray-200 p-3">
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{id}</span>
+                  <span className="text-xs text-gray-500">{entry.bytes?.toLocaleString()} bytes</span>
+                </div>
+                <div className="text-xs text-gray-600">{explorerStatus}</div>
+                <div className="flex flex-col gap-2 md:flex-row md:items-center">
+                  <input
+                    type="url"
+                    value={sourceValue}
+                    placeholder="https://example.com/path/to/audio.wav"
+                    onChange={e => setSources(prev => ({ ...prev, [id]: e.target.value }))}
+                    className="w-full rounded border border-gray-300 p-2 text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleLoad(id, entry.sha256, entry.bytes)}
+                      disabled={!canLoad || !control}
+                      className="rounded border border-gray-300 px-2 py-1 disabled:opacity-50"
+                    >
+                      Load
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUnload(id)}
+                      disabled={!canUnload || !control}
+                      className="rounded border border-gray-300 px-2 py-1 disabled:opacity-50"
+                    >
+                      Unload
+                    </button>
+                  </div>
+                </div>
+                {entryStatus?.message && <div className={statusClass}>{entryStatus.message}</div>}
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <button
+                    type="button"
+                    onClick={() => handlePlay(id)}
+                    disabled={!remoteAssetSet.has(id) || !control}
+                    className="rounded border border-gray-300 px-2 py-1 disabled:opacity-50"
+                  >
+                    Play
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleStop(id)}
+                    disabled={!remoteAssetSet.has(id) || !control}
+                    className="rounded border border-gray-300 px-2 py-1 disabled:opacity-50"
+                  >
+                    Stop
+                  </button>
+                  <label className="flex items-center gap-2">
+                    <span className="text-xs uppercase text-gray-500">Gain</span>
+                    <input
+                      type="range"
+                      min={-60}
+                      max={6}
+                      step={1}
+                      value={gain[id] ?? 0}
+                      onChange={e => handleGain(id, Number(e.target.value))}
+                      disabled={!remoteAssetSet.has(id) || !control}
+                    />
+                    <span className="w-14 text-right text-xs">{(gain[id] ?? 0).toFixed(0)} dB</span>
+                  </label>
+                </div>
+              </div>
+            </li>
+          );
+        })}
       </ul>
-      {assets.length >= 2 && (
+      {manifestEntries.filter(entry => remoteAssetSet.has(entry.id)).length >= 2 && (
         <div style={{ marginTop: '0.5rem' }}>
           <button onClick={handleCrossfade}>Crossfade first two</button>
         </div>

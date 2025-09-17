@@ -1,6 +1,11 @@
 /* @vitest-environment jsdom */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
+
+vi.mock('../ManifestEditor', () => ({
+  __esModule: true,
+  default: () => null,
+}));
 
 if (!(globalThis as any).requestAnimationFrame) {
   (globalThis as any).requestAnimationFrame = (cb: FrameRequestCallback) =>
@@ -164,5 +169,133 @@ describe('UI components', () => {
     await screen.findByText('Recording in progress…');
     expect(screen.getByText(/Session mix level/i)).toBeTruthy();
     expect(startMixRecording).toHaveBeenCalledWith(micStream, expect.any(Function));
+  });
+
+  it('issues load command with status feedback', async () => {
+    const load = vi.fn().mockResolvedValue(undefined);
+    const controlMock = {
+      load,
+      unload: vi.fn().mockResolvedValue(undefined),
+      play: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn().mockResolvedValue(undefined),
+      setGain: vi.fn().mockResolvedValue(undefined),
+      crossfade: vi.fn().mockResolvedValue(undefined),
+      seek: vi.fn().mockResolvedValue(undefined),
+      ducking: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const { useSessionStore } = await import('../../../state/session');
+    const { default: FacilitatorControls } = await import('../FacilitatorControls');
+
+    resetSessionStore(useSessionStore);
+    useSessionStore.setState({
+      role: 'facilitator',
+      manifest: { tone: { id: 'tone', sha256: 'abc', bytes: 1024 } },
+      assets: new Set(),
+      remoteAssets: new Set(),
+      remoteMissing: new Set(['tone']),
+      assetProgress: {},
+      control: controlMock as any,
+    });
+
+    render(<FacilitatorControls />);
+
+    const input = screen.getByPlaceholderText('https://example.com/path/to/audio.wav');
+    fireEvent.change(input, { target: { value: 'https://cdn.example/tone.wav' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load' }));
+
+    expect(load).toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect(load).toHaveBeenCalledWith({
+        id: 'tone',
+        source: 'https://cdn.example/tone.wav',
+        sha256: 'abc',
+        bytes: 1024,
+      });
+    });
+    expect(screen.getByText('Load command acknowledged.')).toBeTruthy();
+  });
+
+  it('issues unload command when explorer has asset', async () => {
+    const unload = vi.fn().mockResolvedValue(undefined);
+    const controlMock = {
+      load: vi.fn().mockResolvedValue(undefined),
+      unload,
+      play: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn().mockResolvedValue(undefined),
+      setGain: vi.fn().mockResolvedValue(undefined),
+      crossfade: vi.fn().mockResolvedValue(undefined),
+      seek: vi.fn().mockResolvedValue(undefined),
+      ducking: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const { useSessionStore } = await import('../../../state/session');
+    const { default: FacilitatorControls } = await import('../FacilitatorControls');
+
+    resetSessionStore(useSessionStore);
+    useSessionStore.setState({
+      role: 'facilitator',
+      manifest: { tone: { id: 'tone', sha256: 'abc', bytes: 1024 } },
+      assets: new Set(),
+      remoteAssets: new Set(['tone']),
+      remoteMissing: new Set(),
+      assetProgress: {},
+      control: controlMock as any,
+    });
+
+    render(<FacilitatorControls />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Unload' }));
+
+    expect(unload).toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect(unload).toHaveBeenCalledWith({ id: 'tone' });
+    });
+    expect(screen.getByText('Unload command acknowledged.')).toBeTruthy();
+  });
+
+  it('shows errors when load command cannot be sent', async () => {
+    const load = vi.fn().mockRejectedValue(new Error('fetch failed'));
+    const controlMock = {
+      load,
+      unload: vi.fn().mockResolvedValue(undefined),
+      play: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn().mockResolvedValue(undefined),
+      setGain: vi.fn().mockResolvedValue(undefined),
+      crossfade: vi.fn().mockResolvedValue(undefined),
+      seek: vi.fn().mockResolvedValue(undefined),
+      ducking: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const { useSessionStore } = await import('../../../state/session');
+    const { default: FacilitatorControls } = await import('../FacilitatorControls');
+
+    resetSessionStore(useSessionStore);
+    useSessionStore.setState({
+      role: 'facilitator',
+      manifest: { tone: { id: 'tone', sha256: 'def', bytes: 2048 } },
+      assets: new Set(),
+      remoteAssets: new Set(),
+      remoteMissing: new Set(['tone']),
+      assetProgress: {},
+      control: controlMock as any,
+    });
+
+    render(<FacilitatorControls />);
+
+    const input = screen.getByPlaceholderText('https://example.com/path/to/audio.wav');
+    fireEvent.change(input, { target: { value: 'https://cdn.example/tone.wav' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load' }));
+
+    await screen.findByText('fetch failed');
+    expect(load).toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Load' }));
+    await screen.findByText('Provide a source URL before loading.');
   });
 });
