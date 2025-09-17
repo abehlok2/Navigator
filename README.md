@@ -48,6 +48,10 @@ Adjust the values as needed for your environment.
 
 Navigator is a monorepo designed to facilitate consciousness exploration. It contains a web interface and a signal processing server.
 
+## User Guide
+
+See [docs/user-guide.md](docs/user-guide.md) for a role-based guide that covers setup, running the stack, and facilitating live sessions.
+
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) (v18 or newer)
