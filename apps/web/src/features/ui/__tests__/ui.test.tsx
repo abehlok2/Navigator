@@ -2,6 +2,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 
+if (!(globalThis as any).requestAnimationFrame) {
+  (globalThis as any).requestAnimationFrame = (cb: FrameRequestCallback) =>
+    setTimeout(() => cb(0), 16) as unknown as number;
+  (globalThis as any).cancelAnimationFrame = (id: number) => clearTimeout(id);
+}
+
 function resetSessionStore(store: any) {
   store.setState({
     role: null,
@@ -99,13 +105,16 @@ describe('UI components', () => {
   });
 
   it('prompts for recording consent and shows decline error', async () => {
-    const startMixRecording = vi.fn(async (_mic, _program, consent: () => Promise<boolean>) => {
+    const startMixRecording = vi.fn(async (_mic, consent: () => Promise<boolean>) => {
       const allowed = await consent();
       if (!allowed) return null;
-      return { stop: vi.fn().mockResolvedValue(new Blob()) };
+      return {
+        startedAt: Date.now(),
+        stop: vi.fn().mockResolvedValue(new Blob()),
+        getLevels: () => ({ left: -120, right: -120 }),
+      };
     });
     vi.doMock('../../audio/recorder', () => ({ startMixRecording }));
-    vi.doMock('../../audio/context', () => ({ getProgramStream: vi.fn(() => ({ id: 'program' })) }));
 
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
 
@@ -122,19 +131,22 @@ describe('UI components', () => {
 
     expect(confirmSpy).toHaveBeenCalled();
     await screen.findByText('Recording consent was declined.');
-    expect(startMixRecording).toHaveBeenCalledWith(micStream, expect.anything(), expect.any(Function), expect.any(Function));
+    expect(startMixRecording).toHaveBeenCalledWith(micStream, expect.any(Function));
     expect(screen.queryByText(/Recording in progress/)).toBeNull();
   });
 
   it('starts recording when consent is granted', async () => {
-    const stopMock = vi.fn().mockResolvedValue(new Blob());
-    const startMixRecording = vi.fn(async (_mic, _program, consent: () => Promise<boolean>) => {
+    const stopMock = vi.fn().mockResolvedValue(new Blob([1], { type: 'audio/webm' }));
+    const startMixRecording = vi.fn(async (_mic, consent: () => Promise<boolean>) => {
       const allowed = await consent();
       if (!allowed) return null;
-      return { stop: stopMock };
+      return {
+        startedAt: Date.now() - 1000,
+        stop: stopMock,
+        getLevels: () => ({ left: -12, right: -10 }),
+      };
     });
     vi.doMock('../../audio/recorder', () => ({ startMixRecording }));
-    vi.doMock('../../audio/context', () => ({ getProgramStream: vi.fn(() => ({ id: 'program' })) }));
 
     vi.spyOn(window, 'confirm').mockReturnValue(true);
 
@@ -150,6 +162,7 @@ describe('UI components', () => {
     fireEvent.click(screen.getByRole('button', { name: /Start Recording/i }));
 
     await screen.findByText('Recording in progress…');
-    expect(startMixRecording).toHaveBeenCalled();
+    expect(screen.getByText(/Session mix level/i)).toBeTruthy();
+    expect(startMixRecording).toHaveBeenCalledWith(micStream, expect.any(Function));
   });
 });
