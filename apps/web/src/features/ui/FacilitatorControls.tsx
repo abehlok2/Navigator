@@ -20,8 +20,6 @@ export default function FacilitatorControls() {
   const manifestEntries = useMemo(() => Object.values(manifest), [manifest]);
   const remoteAssetSet = remoteAssets;
   const remoteMissingSet = remoteMissing;
-
-  const [sources, setSources] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<Record<string, EntryStatus>>({});
 
   const [gain, setGain] = useState<Record<string, number>>({});
@@ -71,13 +69,6 @@ export default function FacilitatorControls() {
       });
       return next;
     });
-    setSources(prev => {
-      const entries = Object.entries(prev).filter(([id]) => validIds.has(id));
-      if (entries.length === Object.keys(prev).length) {
-        return prev;
-      }
-      return Object.fromEntries(entries);
-    });
   }, [manifestEntries]);
 
   const updateStatus = useCallback((id: string, next: EntryStatus) => {
@@ -86,14 +77,6 @@ export default function FacilitatorControls() {
 
   const handleLoad = useCallback(
     async (entryId: string, sha256?: string, bytes?: number) => {
-      const source = sources[entryId]?.trim();
-      if (!source) {
-        updateStatus(entryId, {
-          phase: 'error',
-          message: 'Provide a source URL before loading.',
-        });
-        return;
-      }
       if (!control) {
         updateStatus(entryId, {
           phase: 'error',
@@ -103,7 +86,7 @@ export default function FacilitatorControls() {
       }
       updateStatus(entryId, { phase: 'loading', message: 'Sending load command…' });
       try {
-        await control.load({ id: entryId, source, sha256, bytes });
+        await control.load({ id: entryId, sha256, bytes });
         updateStatus(entryId, { phase: 'success', message: 'Load command acknowledged.' });
       } catch (err) {
         updateStatus(entryId, {
@@ -112,7 +95,7 @@ export default function FacilitatorControls() {
         });
       }
     },
-    [control, sources, updateStatus]
+    [control, updateStatus]
   );
 
   const handleUnload = useCallback(
@@ -190,7 +173,6 @@ export default function FacilitatorControls() {
       <ul className="space-y-4">
         {manifestEntries.map(entry => {
           const id = entry.id;
-          const sourceValue = sources[id] ?? '';
           const entryStatus = status[id];
           const canLoad = !remoteAssetSet.has(id) && entryStatus?.phase !== 'loading';
           const canUnload = remoteAssetSet.has(id) && entryStatus?.phase !== 'unloading';
@@ -221,13 +203,9 @@ export default function FacilitatorControls() {
                 </div>
                 <div className="text-xs text-gray-600">{explorerStatus}</div>
                 <div className="flex flex-col gap-2 md:flex-row md:items-center">
-                  <input
-                    type="url"
-                    value={sourceValue}
-                    placeholder="https://example.com/path/to/audio.wav"
-                    onChange={e => setSources(prev => ({ ...prev, [id]: e.target.value }))}
-                    className="w-full rounded border border-gray-300 p-2 text-sm"
-                  />
+                  <div className="text-xs text-gray-600 md:flex-1">
+                    Explorer playback now relies exclusively on facilitator-provided local media.
+                  </div>
                   <div className="flex gap-2">
                     <button
                       type="button"

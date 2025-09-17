@@ -263,9 +263,8 @@ describe('ControlChannel message handling', () => {
     const invalidate = vi.fn();
     const unload = vi.fn();
     const seek = vi.fn();
-    const loadRemoteAsset = vi.fn(async () => ({ bytes: 2048 }));
     const removeBuffer = vi.fn();
-    const hasBuffer = vi.fn(() => false);
+    const hasBuffer = vi.fn(() => true);
 
     vi.doMock('../../audio/scheduler', () => ({
       __esModule: true,
@@ -278,12 +277,7 @@ describe('ControlChannel message handling', () => {
       invalidate,
       getPlayer: vi.fn(),
     }));
-    vi.doMock('../../audio/assets', () => ({
-      __esModule: true,
-      loadRemoteAsset,
-      hasBuffer,
-      removeBuffer,
-    }));
+    vi.doMock('../../audio/assets', () => ({ __esModule: true, hasBuffer, removeBuffer }));
     vi.doMock('../../audio/context', () => ({ __esModule: true, getMasterGain: vi.fn(() => ({})) }));
     vi.doMock('../../audio/ducking', () => ({
       __esModule: true,
@@ -320,14 +314,13 @@ describe('ControlChannel message handling', () => {
       data: JSON.stringify({
         type: 'cmd.load',
         txn: 'txn-load',
-        payload: { id: 'tone', source: 'https://cdn.example/tone.wav', bytes: 1024 },
+        payload: { id: 'tone', bytes: 1024 },
       }),
     });
 
     await Promise.resolve();
     await new Promise(resolve => setTimeout(resolve, 0));
 
-    expect(loadRemoteAsset).toHaveBeenCalledWith({ id: 'tone', source: 'https://cdn.example/tone.wav', sha256: undefined });
     expect(errors).toHaveLength(0);
     const ack = JSON.parse(dc.send.mock.calls.at(-1)?.[0] as string);
     expect(ack.payload).toEqual({ ok: true, forTxn: 'txn-load' });
@@ -346,9 +339,6 @@ describe('ControlChannel message handling', () => {
     const invalidate = vi.fn();
     const unload = vi.fn();
     const seek = vi.fn();
-    const loadRemoteAsset = vi.fn(async () => {
-      throw new Error('fetch failed');
-    });
     const removeBuffer = vi.fn();
     const hasBuffer = vi.fn(() => false);
 
@@ -363,12 +353,7 @@ describe('ControlChannel message handling', () => {
       invalidate,
       getPlayer: vi.fn(),
     }));
-    vi.doMock('../../audio/assets', () => ({
-      __esModule: true,
-      loadRemoteAsset,
-      hasBuffer,
-      removeBuffer,
-    }));
+    vi.doMock('../../audio/assets', () => ({ __esModule: true, hasBuffer, removeBuffer }));
     vi.doMock('../../audio/context', () => ({ __esModule: true, getMasterGain: vi.fn(() => ({})) }));
     vi.doMock('../../audio/ducking', () => ({
       __esModule: true,
@@ -405,17 +390,22 @@ describe('ControlChannel message handling', () => {
       data: JSON.stringify({
         type: 'cmd.load',
         txn: 'txn-load',
-        payload: { id: 'tone', source: 'https://cdn.example/tone.wav', bytes: 1024 },
+        payload: { id: 'tone', bytes: 1024 },
       }),
     });
 
     await Promise.resolve();
     await new Promise(resolve => setTimeout(resolve, 0));
 
-    expect(loadRemoteAsset).toHaveBeenCalled();
-    expect(errors).toContain('fetch failed');
+    expect(errors).toContain(
+      'Asset is not available locally. Provide facilitator-supplied files before issuing load commands.',
+    );
     const ack = JSON.parse(dc.send.mock.calls.at(-1)?.[0] as string);
-    expect(ack.payload).toEqual({ ok: false, forTxn: 'txn-load', error: 'fetch failed' });
+    expect(ack.payload).toEqual({
+      ok: false,
+      forTxn: 'txn-load',
+      error: 'Asset is not available locally. Provide facilitator-supplied files before issuing load commands.',
+    });
     const finalProgress = setAssetProgressSpy.mock.calls.at(-1);
     expect(finalProgress?.[1]).toBe(0);
     const finalState = useSessionStore.getState();
@@ -427,7 +417,6 @@ describe('ControlChannel message handling', () => {
     const invalidate = vi.fn();
     const unload = vi.fn();
     const seek = vi.fn();
-    const loadRemoteAsset = vi.fn();
     const removeBuffer = vi.fn();
     const hasBuffer = vi.fn(() => true);
 
@@ -442,12 +431,7 @@ describe('ControlChannel message handling', () => {
       invalidate,
       getPlayer: vi.fn(),
     }));
-    vi.doMock('../../audio/assets', () => ({
-      __esModule: true,
-      loadRemoteAsset,
-      hasBuffer,
-      removeBuffer,
-    }));
+    vi.doMock('../../audio/assets', () => ({ __esModule: true, hasBuffer, removeBuffer }));
     vi.doMock('../../audio/context', () => ({ __esModule: true, getMasterGain: vi.fn(() => ({})) }));
     vi.doMock('../../audio/ducking', () => ({
       __esModule: true,
@@ -506,7 +490,6 @@ describe('ControlChannel message handling', () => {
     }));
     vi.doMock('../../audio/assets', () => ({
       __esModule: true,
-      loadRemoteAsset: vi.fn(),
       hasBuffer: vi.fn(() => true),
       removeBuffer: vi.fn(),
     }));
