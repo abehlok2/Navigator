@@ -115,10 +115,10 @@ pnpm serve:web
 Compile the TypeScript source to JavaScript:
 
 ```bash
-pnpm typecheck
+pnpm build:signal
 ```
 
-Run the compiled server:
+Run the compiled server (the build step runs automatically if needed):
 
 ```bash
 pnpm start:signal
