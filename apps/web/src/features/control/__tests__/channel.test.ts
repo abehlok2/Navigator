@@ -17,6 +17,13 @@ class FakeDataChannel {
   }
 }
 
+function ack(dc: FakeDataChannel, txn?: string) {
+  if (!txn) return;
+  dc.emit('message', {
+    data: JSON.stringify({ type: 'ack', payload: { ok: true, forTxn: txn } }),
+  });
+}
+
 describe('ControlChannel message handling', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -527,5 +534,73 @@ describe('ControlChannel message handling', () => {
     expect(seek).toHaveBeenCalledWith('tone', 1.5);
     const ack = JSON.parse(dc.send.mock.calls.at(-1)?.[0] as string);
     expect(ack.payload).toEqual({ ok: true, forTxn: 'txn-seek' });
+  });
+
+  it('resends cached manifest when data channel reopens', async () => {
+    vi.doMock('../../audio/scheduler', () => ({
+      __esModule: true,
+      playAt: vi.fn(),
+      stop: vi.fn(),
+      crossfade: vi.fn(),
+      setGain: vi.fn(),
+      seek: vi.fn(),
+      unload: vi.fn(),
+      invalidate: vi.fn(),
+      getPlayer: vi.fn(),
+    }));
+    vi.doMock('../../audio/context', () => ({ __esModule: true, getMasterGain: vi.fn(() => ({})) }));
+    vi.doMock('../../audio/ducking', () => ({
+      __esModule: true,
+      setupSpeechDucking: vi.fn(),
+      cleanupSpeechDucking: vi.fn(),
+    }));
+    vi.doMock('../../audio/speech', () => ({
+      __esModule: true,
+      setLocalSpeechFallback: vi.fn(),
+      hasSpeechInput: vi.fn(() => false),
+    }));
+
+    const { ControlChannel } = await import('../channel');
+
+    const dc = new FakeDataChannel();
+    const errors: string[] = [];
+    const channel = new ControlChannel(dc as unknown as RTCDataChannel, {
+      role: 'facilitator',
+      roomId: 'room-1',
+      version: 'v1',
+      onError: err => errors.push(err),
+    });
+
+    dc.emit('open', {});
+    const firstHello = JSON.parse(dc.send.mock.calls.at(-1)?.[0] as string);
+    expect(firstHello.type).toBe('hello');
+    expect(firstHello.txn).toBeDefined();
+    ack(dc, firstHello.txn);
+
+    const entries = [{ id: 'tone', sha256: 'abc', bytes: 1024 }];
+    const manifestPromise = channel.setManifest(entries);
+    const firstManifest = JSON.parse(dc.send.mock.calls.at(-1)?.[0] as string);
+    expect(firstManifest.type).toBe('asset.manifest');
+    expect(firstManifest.payload).toEqual({ entries });
+    ack(dc, firstManifest.txn);
+    await manifestPromise;
+
+    expect(errors).toHaveLength(0);
+
+    dc.send.mockClear();
+    dc.emit('open', {});
+    const secondHello = JSON.parse(dc.send.mock.calls.at(0)?.[0] as string);
+    expect(secondHello.type).toBe('hello');
+    expect(secondHello.txn).toBeDefined();
+    ack(dc, secondHello.txn);
+    await Promise.resolve();
+
+    expect(dc.send).toHaveBeenCalledTimes(2);
+    const resentManifest = JSON.parse(dc.send.mock.calls.at(-1)?.[0] as string);
+    expect(resentManifest.type).toBe('asset.manifest');
+    expect(resentManifest.payload).toEqual({ entries });
+    ack(dc, resentManifest.txn);
+
+    expect(errors).toHaveLength(0);
   });
 });
