@@ -13,7 +13,8 @@
     "build:web": "pnpm -C apps/web build",
     "serve:web": "pnpm -C apps/web preview",
     "dev:signal": "pnpm -C apps/signal dev",
-    "start:signal": "node apps/signal/dist/server.js",
+    "build:signal": "pnpm -C apps/signal build",
+    "start:signal": "pnpm build:signal && node apps/signal/dist/server.js",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc -b",
     "test": "vitest run"

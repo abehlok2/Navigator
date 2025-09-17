@@ -1,0 +1,8 @@
+node_modules
+apps/*/node_modules
+apps/*/dist
+dist
+.git
+.gitignore
+pnpm-debug.log
+.env
