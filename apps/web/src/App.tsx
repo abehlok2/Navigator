@@ -47,6 +47,7 @@ export default function App() {
   }));
   const [roomId, setRoomId] = useState('');
   const [targetId, setTargetId] = useState('');
+  const [joinPassword, setJoinPassword] = useState('');
   const [participantId, setParticipantId] = useState<string | null>(null);
   const [participants, setParticipants] = useState<ParticipantSummary[]>([]);
   const [connecting, setConnecting] = useState(false);
@@ -288,7 +289,7 @@ export default function App() {
       void leaveRoom(roomId, joinedParticipantId, token).catch(() => {});
     };
     try {
-      const join = await joinRoom(roomId, role, token);
+      const join = await joinRoom(roomId, role, token, joinPassword || undefined);
       const remoteList = join.participants;
       setParticipants(remoteList);
       const resolvedTarget = remoteList.find(p => p.id === selectedTarget.id);
@@ -335,6 +336,7 @@ export default function App() {
   }, [
     cleanupRemoteAudio,
     handleTrack,
+    joinPassword,
     participants,
     roomId,
     role,
@@ -390,6 +392,16 @@ export default function App() {
           >
             {creatingRoom ? 'Creating…' : 'Create Room'}
           </Button>
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="password"
+            value={joinPassword}
+            onChange={e => setJoinPassword(e.target.value)}
+            placeholder="Room password (optional)"
+            className="flex-1 rounded border border-gray-300 p-2"
+            autoComplete="current-password"
+          />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <select
