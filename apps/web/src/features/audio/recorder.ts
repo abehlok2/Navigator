@@ -88,19 +88,29 @@ export async function startMixRecording(
   const cleanup = () => {
     try {
       master.disconnect(masterTap);
-    } catch {}
+    } catch (err) {
+      /* ignore disconnect errors */
+    }
     try {
       masterTap.disconnect();
-    } catch {}
+    } catch (err) {
+      /* ignore disconnect errors */
+    }
     try {
       mixBus.disconnect();
-    } catch {}
+    } catch (err) {
+      /* ignore disconnect errors */
+    }
     try {
       splitter.disconnect();
-    } catch {}
+    } catch (err) {
+      /* ignore disconnect errors */
+    }
     try {
       micSource.disconnect();
-    } catch {}
+    } catch (err) {
+      /* ignore disconnect errors */
+    }
   };
 
   recorder.onstop = () => {
