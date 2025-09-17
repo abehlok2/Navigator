@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { SIGNAL_URL } from '../../../config';
 
 class FakeRTCDataChannel {
   public send = vi.fn<[string], void>();
@@ -166,7 +167,9 @@ describe('connectWithReconnection', () => {
     await Promise.resolve();
 
     expect(websocketInstances).toHaveLength(1);
-    expect(websocketInstances[0].url).toBe('ws://localhost:8080?roomId=room1&participantId=p1');
+    expect(websocketInstances[0].url).toBe(
+      `${SIGNAL_URL}?roomId=room1&participantId=p1`
+    );
     expect(websocketInstances[0].protocol).toBe('secret-token');
 
     expect(peerInstances).toHaveLength(1);

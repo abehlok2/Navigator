@@ -4,6 +4,7 @@ import { useSessionStore } from '../../state/session';
 import { startTelemetry } from '../audio/telemetry';
 import { PeerClock } from '../audio/peerClock';
 import { watchClock } from '../audio/scheduler';
+import { SIGNAL_URL } from '../../config';
 
 export interface ConnectOptions {
   roomId: string;
@@ -47,10 +48,8 @@ export async function connect(
   });
 
 
-  const signalUrl =
-    import.meta.env.VITE_SIGNAL_URL ?? 'ws://localhost:8080';
   const ws = new WebSocket(
-    `${signalUrl}?roomId=${opts.roomId}&participantId=${opts.participantId}`,
+    `${SIGNAL_URL}?roomId=${opts.roomId}&participantId=${opts.participantId}`,
     opts.token
   );
 

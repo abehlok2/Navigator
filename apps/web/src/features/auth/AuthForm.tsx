@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '../../state/auth';
 import { Button } from '../../components/ui/button';
+import { apiUrl } from '../../config';
 
 export default function AuthForm() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -15,14 +16,14 @@ export default function AuthForm() {
     setError(null);
     try {
       if (mode === 'register') {
-        const res = await fetch('http://localhost:8080/register', {
+        const res = await fetch(apiUrl('/register'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password, role }),
         });
         if (!res.ok) throw new Error('register failed');
       }
-      const res = await fetch('http://localhost:8080/login', {
+      const res = await fetch(apiUrl('/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),

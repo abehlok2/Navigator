@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { apiUrl } from '../config';
 
 interface AuthState {
   token: string | null;
@@ -17,7 +18,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const token = get().token;
     if (token) {
       try {
-        await fetch('http://localhost:8080/logout', {
+        await fetch(apiUrl('/logout'), {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
         });

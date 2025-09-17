@@ -72,17 +72,19 @@ Start the Vite development server:
 pnpm dev:web
 ```
 
-When deploying on a personal machine, set the signal server host and port for the web client using the `VITE_SIGNAL_URL` environment variable. It defaults to `ws://localhost:8080`.
+When deploying on a personal machine, configure the backend host and port for the web client using environment variables. Set `VITE_API_URL` to the HTTP origin for REST requests and (optionally) `VITE_SIGNAL_URL` for WebSocket signaling. When not provided, the web client defaults to `http://localhost:8080` for API requests during development and derives the signal URL from the API origin.
 
 Create an `.env` file in `apps/web`:
 
 ```bash
+VITE_API_URL=http://your-host:8080
 VITE_SIGNAL_URL=ws://your-host:8080
 ```
 
-or export the variable when running commands:
+or export the variables when running commands:
 
 ```bash
+VITE_API_URL=http://your-host:8080 \
 VITE_SIGNAL_URL=ws://your-host:8080 pnpm dev:web
 ```
 
