@@ -1,4 +1,4 @@
-import { getAudioContext } from './context';
+import { getAudioContext, getMasterGain } from './context';
 
 function dbToGain(db: number): number {
   return Math.pow(10, db / 20);
@@ -11,7 +11,7 @@ export class BinauralGenerator {
   private right?: OscillatorNode;
 
   constructor() {
-    this.gain.connect(this.ctx.destination);
+    this.gain.connect(getMasterGain());
   }
 
   start(baseFreq = 220, beatFreq = 4) {
@@ -53,7 +53,7 @@ export class NoiseGenerator {
 
   constructor(type: 'white' | 'pink' | 'brown' = 'white') {
     this.buffer = createNoiseBuffer(this.ctx, type);
-    this.gain.connect(this.ctx.destination);
+    this.gain.connect(getMasterGain());
   }
 
   start() {
