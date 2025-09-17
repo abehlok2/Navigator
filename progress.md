@@ -55,7 +55,7 @@
 
 - [x] Initialized shared AudioContext with user gesture unlocking.
 - [x] Added drag-drop asset preloading with manifest matching.
-- [x] Implemented FilePlayer, generators, scheduling helper and crossfades.
+- [x] Implemented FilePlayer, scheduling helper and crossfades.
 - [x] Added speech-controlled ducking and optional local recording.
 
 ### Next steps
