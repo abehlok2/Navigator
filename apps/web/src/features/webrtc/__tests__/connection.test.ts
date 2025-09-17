@@ -66,6 +66,11 @@ class FakeWebSocket {
   public onmessage: ((ev: { data: string }) => void) | null = null;
   public sent: string[] = [];
   private listeners = new Map<string, Array<(...args: any[]) => void>>();
+  public readyState = 1;
+  public close = vi.fn(() => {
+    this.readyState = 3;
+    this.emit('close');
+  });
 
   constructor(public url: string, public protocol?: string) {
     websocketInstances.push(this);
@@ -89,8 +94,6 @@ class FakeWebSocket {
       handler(...args);
     }
   }
-
-  close() {}
 }
 
 const peerInstances: FakeRTCPeerConnection[] = [];
@@ -119,6 +122,7 @@ describe('connectWithReconnection', () => {
       setTelemetry: vi.fn(),
       setHeartbeat: vi.fn(),
       setMicStream: vi.fn(),
+      resetRemotePresence: vi.fn(),
     };
 
     vi.doMock('../../state/session', () => ({
@@ -176,6 +180,7 @@ describe('connectWithReconnection', () => {
     expect(peerInstances[0].config).toEqual({ iceServers: [{ urls: ['stun:example.org'] }] });
 
     stop();
+    expect(websocketInstances[0].close).toHaveBeenCalled();
   });
 
   it('refreshes ICE servers when credentials message is received', async () => {
@@ -189,6 +194,7 @@ describe('connectWithReconnection', () => {
       setTelemetry: vi.fn(),
       setHeartbeat: vi.fn(),
       setMicStream: vi.fn(),
+      resetRemotePresence: vi.fn(),
     };
 
     vi.doMock('../../state/session', () => ({
@@ -286,6 +292,7 @@ describe('connectWithReconnection', () => {
       setTelemetry: vi.fn(),
       setHeartbeat: vi.fn(),
       setMicStream: vi.fn(),
+      resetRemotePresence: vi.fn(),
     };
 
     vi.doMock('../../state/session', () => ({

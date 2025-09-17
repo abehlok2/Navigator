@@ -274,17 +274,30 @@ export default function App() {
     setConnecting(true);
     setError(null);
     setParticipantId(null);
-    disconnectRef.current?.();
+    const previousDisconnect = disconnectRef.current;
+    disconnectRef.current = null;
+    previousDisconnect?.();
     cleanupRemoteAudio();
+    let joinedParticipantId: string | null = null;
+    let hasLeft = false;
+    const leaveIfNeeded = () => {
+      if (hasLeft || !joinedParticipantId) {
+        return;
+      }
+      hasLeft = true;
+      void leaveRoom(roomId, joinedParticipantId, token).catch(() => {});
+    };
     try {
       const join = await joinRoom(roomId, role, token);
       const remoteList = join.participants;
       setParticipants(remoteList);
       const resolvedTarget = remoteList.find(p => p.id === selectedTarget.id);
       if (!resolvedTarget || resolvedTarget.id === join.participantId) {
-        await leaveRoom(roomId, join.participantId, token).catch(() => {});
+        joinedParticipantId = join.participantId;
+        leaveIfNeeded();
         throw new Error('target-unavailable');
       }
+      joinedParticipantId = join.participantId;
       setParticipantId(join.participantId);
       const disconnect = connectWithReconnection({
         roomId,
@@ -297,12 +310,20 @@ export default function App() {
         version: '1',
         onTrack: handleTrack,
       });
+      let disconnected = false;
       disconnectRef.current = () => {
+        if (disconnected) return;
+        disconnected = true;
         disconnect();
         cleanupRemoteAudio();
+        setParticipantId(null);
+        useSessionStore.getState().resetRemotePresence();
+        leaveIfNeeded();
+        disconnectRef.current = null;
       };
     } catch (err) {
       console.error(err);
+      leaveIfNeeded();
       if (err instanceof Error && err.message === 'target-unavailable') {
         setError('Selected participant is no longer available');
       } else {
