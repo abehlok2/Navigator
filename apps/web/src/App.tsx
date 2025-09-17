@@ -17,6 +17,9 @@ import {
   joinRoom,
   leaveRoom,
   listParticipants,
+  setRoomPassword,
+  updateParticipantRole,
+  removeRoomParticipant,
   type ParticipantSummary,
   type Role,
 } from './features/session/api';
@@ -26,6 +29,10 @@ const isRole = (value: string | null): value is Role =>
   value === 'facilitator' || value === 'explorer' || value === 'listener';
 
 const formatRole = (value: Role): string => value.charAt(0).toUpperCase() + value.slice(1);
+
+const ROLE_OPTIONS: Role[] = ['facilitator', 'explorer', 'listener'];
+type ModerationNotice = { type: 'success' | 'error'; message: string };
+type PendingModeration = { id: string; type: 'role' | 'remove' };
 
 export default function App() {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -46,11 +53,16 @@ export default function App() {
   const [creatingRoom, setCreatingRoom] = useState(false);
   const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [roomPassword, setRoomPasswordInput] = useState('');
+  const [settingPassword, setSettingPassword] = useState(false);
+  const [moderationNotice, setModerationNotice] = useState<ModerationNotice | null>(null);
+  const [pendingModeration, setPendingModeration] = useState<PendingModeration | null>(null);
   const sessionRole = useSessionStore(state => state.role);
   const isListenerSession = sessionRole === 'listener';
   const isFacilitatorSession = sessionRole === 'facilitator';
   const isExplorerSession = sessionRole === 'explorer';
   const canCreateRoom = role === 'facilitator';
+  const canModerateParticipants = role === 'facilitator';
 
   const availableTargets = useMemo(() => {
     const others = participants.filter(p => p.id !== participantId);
@@ -99,6 +111,33 @@ export default function App() {
     }
   }, [roomId, token]);
 
+  const handleSetRoomPassword = useCallback(async () => {
+    if (!token) {
+      setModerationNotice({ type: 'error', message: 'Authentication token is missing' });
+      return;
+    }
+    if (!roomId) {
+      setModerationNotice({ type: 'error', message: 'Room ID is required to update the password' });
+      return;
+    }
+    setSettingPassword(true);
+    setModerationNotice(null);
+    try {
+      const nextPassword = roomPassword === '' ? undefined : roomPassword;
+      await setRoomPassword(roomId, token, nextPassword);
+      setRoomPasswordInput('');
+      setModerationNotice({
+        type: 'success',
+        message: nextPassword ? 'Room password updated' : 'Room password cleared',
+      });
+    } catch (err) {
+      console.error(err);
+      setModerationNotice({ type: 'error', message: 'Failed to update room password' });
+    } finally {
+      setSettingPassword(false);
+    }
+  }, [roomId, roomPassword, token]);
+
   useEffect(() => {
     if (!token) {
       setParticipants([]);
@@ -112,6 +151,64 @@ export default function App() {
     remoteStreamCleanups.current.clear();
     resetRemoteFacilitatorStreams();
   }, []);
+
+  const handleParticipantRoleChange = useCallback(
+    async (id: string, nextRole: Role) => {
+      if (!token) {
+        setModerationNotice({ type: 'error', message: 'Authentication token is missing' });
+        return;
+      }
+      if (!roomId) {
+        setModerationNotice({ type: 'error', message: 'Room ID is required to manage participants' });
+        return;
+      }
+      setPendingModeration({ id, type: 'role' });
+      setModerationNotice(null);
+      try {
+        await updateParticipantRole(roomId, id, nextRole, token);
+        setParticipants(prev => prev.map(p => (p.id === id ? { ...p, role: nextRole } : p)));
+        setModerationNotice({ type: 'success', message: 'Participant role updated' });
+      } catch (err) {
+        console.error(err);
+        setModerationNotice({ type: 'error', message: 'Failed to update participant role' });
+      } finally {
+        setPendingModeration(null);
+      }
+    },
+    [roomId, token]
+  );
+
+  const handleRemoveParticipant = useCallback(
+    async (id: string) => {
+      if (!token) {
+        setModerationNotice({ type: 'error', message: 'Authentication token is missing' });
+        return;
+      }
+      if (!roomId) {
+        setModerationNotice({ type: 'error', message: 'Room ID is required to manage participants' });
+        return;
+      }
+      setPendingModeration({ id, type: 'remove' });
+      setModerationNotice(null);
+      try {
+        await removeRoomParticipant(roomId, id, token);
+        setParticipants(prev => prev.filter(p => p.id !== id));
+        if (targetId === id) {
+          setTargetId('');
+          disconnectRef.current?.();
+          cleanupRemoteAudio();
+          setParticipantId(null);
+        }
+        setModerationNotice({ type: 'success', message: 'Participant removed from room' });
+      } catch (err) {
+        console.error(err);
+        setModerationNotice({ type: 'error', message: 'Failed to remove participant' });
+      } finally {
+        setPendingModeration(null);
+      }
+    },
+    [cleanupRemoteAudio, roomId, targetId, token]
+  );
 
   const handleTrack = useCallback(
     (event: RTCTrackEvent) => {
@@ -301,25 +398,107 @@ export default function App() {
           </Button>
           {participantId && <span>Participant ID: {participantId}</span>}
         </div>
-        {participants.length > 0 && (
-          <div className="rounded border border-gray-200 p-2 text-xs text-gray-600">
+        {(participants.length > 0 || canModerateParticipants) && (
+          <div className="rounded border border-gray-200 p-3 text-xs text-gray-600 sm:text-sm">
             <div className="text-sm font-medium text-gray-800">Participants</div>
-            <ul className="mt-1 space-y-1">
-              {participants.map(participant => (
-                <li
-                  key={participant.id}
-                  className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium capitalize">{participant.role}</span>
-                    <span className="font-mono text-[11px] text-gray-500">{participant.id}</span>
-                  </div>
-                  <span className={participant.connected ? 'text-green-600' : 'text-gray-500'}>
-                    {participant.connected ? 'connected' : 'offline'}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            {canModerateParticipants && (
+              <div className="mt-3 space-y-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <input
+                    type="password"
+                    value={roomPassword}
+                    onChange={e => setRoomPasswordInput(e.target.value)}
+                    placeholder="Set room password"
+                    className="flex-1 rounded border border-gray-300 p-2"
+                    disabled={settingPassword}
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleSetRoomPassword}
+                    disabled={settingPassword || !roomId}
+                    className="px-3 py-2"
+                  >
+                    {settingPassword ? 'Saving…' : 'Save Password'}
+                  </Button>
+                </div>
+                <div className="text-[11px] text-gray-500">Leave blank to clear the room password.</div>
+              </div>
+            )}
+            {canModerateParticipants && moderationNotice && (
+              <div
+                className={`mt-2 text-sm ${
+                  moderationNotice.type === 'error' ? 'text-red-600' : 'text-green-600'
+                }`}
+              >
+                {moderationNotice.message}
+              </div>
+            )}
+            {participants.length > 0 ? (
+              <ul className="mt-3 space-y-2">
+                {participants.map(participant => {
+                  const isSelfParticipant = participantId === participant.id;
+                  const isPending = pendingModeration?.id === participant.id;
+                  const isRemoving = isPending && pendingModeration?.type === 'remove';
+                  const isUpdatingRole = isPending && pendingModeration?.type === 'role';
+                  return (
+                    <li key={participant.id} className="rounded border border-gray-100 p-2">
+                      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium capitalize">{participant.role}</span>
+                          <span className="font-mono text-[11px] text-gray-500">{participant.id}</span>
+                          {isSelfParticipant && (
+                            <span className="text-[10px] font-semibold uppercase text-blue-600">You</span>
+                          )}
+                        </div>
+                        <span className={participant.connected ? 'text-green-600' : 'text-gray-500'}>
+                          {participant.connected ? 'connected' : 'offline'}
+                        </span>
+                      </div>
+                      {canModerateParticipants && (
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <label className="flex items-center gap-2 text-xs text-gray-600 sm:text-sm">
+                            <span>Role</span>
+                            <select
+                              value={participant.role}
+                              onChange={e => {
+                                const nextRole = e.target.value as Role;
+                                if (nextRole !== participant.role && !isSelfParticipant) {
+                                  handleParticipantRoleChange(participant.id, nextRole);
+                                }
+                              }}
+                              className="rounded border border-gray-300 p-1 text-xs sm:text-sm"
+                              disabled={isPending || isSelfParticipant}
+                            >
+                              {ROLE_OPTIONS.map(option => (
+                                <option key={option} value={option}>
+                                  {formatRole(option)}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveParticipant(participant.id)}
+                            className="rounded border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                            disabled={isPending || isSelfParticipant}
+                          >
+                            {isRemoving ? 'Removing…' : 'Remove'}
+                          </button>
+                          {isUpdatingRole && (
+                            <span className="text-[11px] text-gray-500">Updating role…</span>
+                          )}
+                          {isSelfParticipant && (
+                            <span className="text-[11px] text-gray-500">You cannot modify your own entry.</span>
+                          )}
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div className="mt-3 text-xs text-gray-500">No participants in this room yet.</div>
+            )}
           </div>
         )}
         {error && <div className="text-sm text-red-600">{error}</div>}

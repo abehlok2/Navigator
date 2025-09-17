@@ -73,3 +73,39 @@ export async function listParticipants(roomId: string, token: string): Promise<P
   const data = (await res.json()) as { participants?: ParticipantSummary[] };
   return data.participants ?? [];
 }
+
+export async function setRoomPassword(roomId: string, token: string, password?: string): Promise<void> {
+  const res = await fetch(`${BASE_URL}/rooms/${roomId}/password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify(password ? { password } : {}),
+  });
+  if (!res.ok) throw new Error('failed to set room password');
+}
+
+export async function updateParticipantRole(
+  roomId: string,
+  participantId: string,
+  role: Role,
+  token: string
+): Promise<void> {
+  const res = await fetch(`${BASE_URL}/rooms/${roomId}/role`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify({ participantId, role }),
+  });
+  if (!res.ok) throw new Error('failed to update participant role');
+}
+
+export async function removeRoomParticipant(
+  roomId: string,
+  participantId: string,
+  token: string
+): Promise<void> {
+  const res = await fetch(`${BASE_URL}/rooms/${roomId}/kick`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify({ participantId }),
+  });
+  if (!res.ok) throw new Error('failed to remove participant');
+}
