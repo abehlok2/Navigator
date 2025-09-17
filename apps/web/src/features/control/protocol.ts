@@ -84,6 +84,9 @@ export const assetEntrySchema = z.object({
   id: z.string(),
   sha256: z.string(),
   bytes: z.number(),
+  title: z.string().optional(),
+  notes: z.string().optional(),
+  url: z.string().optional(),
 });
 
 export const assetManifestSchema = z.object({

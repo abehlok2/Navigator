@@ -48,7 +48,14 @@ describe('UI components', () => {
     useSessionStore.setState({
       role: 'explorer',
       manifest: {
-        tone: { id: 'tone', sha256: 'hash1', bytes: 512 },
+        tone: {
+          id: 'tone',
+          sha256: 'hash1',
+          bytes: 512,
+          title: 'Soothing Tone',
+          notes: 'Use for intro segment',
+          url: 'https://example.com/tone.wav',
+        },
       },
       assets: new Set(['tone']),
       remoteAssets: new Set(['tone']),
@@ -57,6 +64,11 @@ describe('UI components', () => {
 
     render(<AssetAvailability />);
 
+    expect(screen.getByText('Soothing Tone')).toBeTruthy();
+    expect(screen.getByText('ID: tone')).toBeTruthy();
+    expect(screen.getByText('Use for intro segment')).toBeTruthy();
+    const sourceLink = screen.getByRole('link', { name: /Source/i });
+    expect(sourceLink.getAttribute('href')).toBe('https://example.com/tone.wav');
     expect(screen.queryByText(/Explorer progress/)).toBeNull();
   });
 
@@ -68,7 +80,7 @@ describe('UI components', () => {
     useSessionStore.setState({
       role: 'facilitator',
       manifest: {
-        tone: { id: 'tone', sha256: 'hash1', bytes: 256 },
+        tone: { id: 'tone', sha256: 'hash1', bytes: 256, title: 'Tone Pad' },
       },
       assets: new Set(['tone']),
       remoteAssets: new Set(['tone']),

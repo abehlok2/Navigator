@@ -47,13 +47,34 @@ export default function AssetAvailability() {
             : 0;
           const localStatus = localAssets.has(entry.id) ? 'Loaded' : progress?.loaded ? 'Loading…' : 'Missing';
           const remoteStatus = remoteAssets.has(entry.id) ? 'Loaded' : 'Missing';
+          const displayTitle = entry.title?.trim() || entry.id;
+          const trimmedNotes = entry.notes?.trim();
+          const trimmedUrl = entry.url?.trim();
           return (
             <li key={entry.id} className="rounded border border-gray-200 p-2">
-              <div className="flex items-center justify-between">
-                <span className="font-medium">{entry.id}</span>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="font-medium">{displayTitle}</div>
+                  <div className="text-xs text-gray-500">ID: {entry.id}</div>
+                  {trimmedNotes && (
+                    <div className="mt-1 whitespace-pre-wrap text-xs text-gray-600">{trimmedNotes}</div>
+                  )}
+                  {trimmedUrl && (
+                    <div className="mt-1 text-xs">
+                      <a
+                        href={trimmedUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        Source
+                      </a>
+                    </div>
+                  )}
+                </div>
                 <span className="text-xs text-gray-500">{formatBytes(entry.bytes)}</span>
               </div>
-              <div className="text-xs text-gray-600">Local: {localStatus} ({pct}%)</div>
+              <div className="mt-2 text-xs text-gray-600">Local: {localStatus} ({pct}%)</div>
               {role === 'facilitator' && (
                 <div className="text-xs text-gray-600">Explorer: {remoteStatus}</div>
               )}
