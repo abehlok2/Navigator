@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { getAudioContext } from '../audio/context';
+import { registerRawAsset } from '../audio/assets';
 import { useSessionStore } from '../../state/session';
 import type { AssetManifest } from '../control/protocol';
 
@@ -138,6 +139,8 @@ export default function ManifestEditor() {
           digestSha256(arrayBuffer),
           estimateDuration(arrayBuffer),
         ]);
+        registerRawAsset(sha256, arrayBuffer, file.type || undefined);
+
         const entry: ManifestDraftEntry = {
           key: generateKey(),
           id: file.name,

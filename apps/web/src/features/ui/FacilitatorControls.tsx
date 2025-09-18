@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from '../../components/ui/card';
 import { useSessionStore } from '../../state/session';
+import { getRawAssetById } from '../audio/assets';
 import ManifestEditor from './ManifestEditor';
 
 type EntryStatusPhase = 'idle' | 'loading' | 'unloading' | 'success' | 'error';
@@ -83,6 +84,28 @@ export default function FacilitatorControls() {
     setStatus(prev => ({ ...prev, [id]: next }));
   }, []);
 
+  const toDataUrl = useCallback((data: ArrayBuffer, mimeType?: string) => {
+    const bytes = new Uint8Array(data);
+    let base64: string;
+    if (typeof globalThis.btoa === 'function') {
+      let binary = '';
+      bytes.forEach(b => {
+        binary += String.fromCharCode(b);
+      });
+      base64 = globalThis.btoa(binary);
+    } else {
+      const bufferCtor = (globalThis as any).Buffer as
+        | { from(data: Uint8Array): { toString(encoding: string): string } }
+        | undefined;
+      if (!bufferCtor) {
+        throw new Error('No base64 encoder available in this environment.');
+      }
+      base64 = bufferCtor.from(bytes).toString('base64');
+    }
+    const type = mimeType && mimeType.trim() ? mimeType : 'application/octet-stream';
+    return `data:${type};base64,${base64}`;
+  }, []);
+
   const handleLoad = useCallback(
     async (entryId: string, sha256?: string, bytes?: number) => {
       if (!control) {
@@ -94,7 +117,9 @@ export default function FacilitatorControls() {
       }
       updateStatus(entryId, { phase: 'loading', message: 'Sending load command…' });
       try {
-        await control.load({ id: entryId, sha256, bytes });
+        const stored = getRawAssetById(entryId);
+        const source = stored ? toDataUrl(stored.data, stored.mimeType) : undefined;
+        await control.load({ id: entryId, sha256, bytes, ...(source ? { source } : {}) });
         updateStatus(entryId, { phase: 'success', message: 'Load command acknowledged.' });
       } catch (err) {
         updateStatus(entryId, {
@@ -103,7 +128,7 @@ export default function FacilitatorControls() {
         });
       }
     },
-    [control, updateStatus]
+    [control, toDataUrl, updateStatus]
   );
 
   const handleUnload = useCallback(

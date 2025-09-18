@@ -11,10 +11,17 @@ import {
   invalidate as invalidatePlayer,
   getPlayer,
 } from '../audio/scheduler';
-import { getMasterGain } from '../audio/context';
+import { getAudioContext, getMasterGain } from '../audio/context';
 import { cleanupSpeechDucking, setupSpeechDucking } from '../audio/ducking';
 import { hasSpeechInput, setLocalSpeechFallback } from '../audio/speech';
-import { hasBuffer, removeBuffer } from '../audio/assets';
+import {
+  hasBuffer,
+  removeBuffer,
+  setBuffer,
+  registerRawAsset,
+  getRawAssetBySha,
+  digestSha256,
+} from '../audio/assets';
 import {
   wireMessageSchema,
   payloadSchemaByType,
@@ -53,6 +60,7 @@ export class ControlChannel {
   private pending = new Map<string, Pending>();
   private duckingConfig: CmdDucking | null = null;
   private lastManifest: AssetManifest['entries'] | null = null;
+  private lastFetchedContentType: string | null = null;
 
   constructor(dc: RTCDataChannel, opts: ControlChannelOptions) {
     this.dc = dc;
@@ -237,6 +245,30 @@ export class ControlChannel {
     }
   }
 
+  private async fetchAssetSource(
+    source: string,
+    totalBytes: number,
+    state: ReturnType<typeof useSessionStore.getState>,
+    id: string,
+    expectedBytes?: number,
+  ): Promise<ArrayBuffer> {
+    this.lastFetchedContentType = null;
+    const response = await fetch(source);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch asset (${response.status})`);
+    }
+    this.lastFetchedContentType = response.headers.get('content-type');
+    const array = await response.arrayBuffer();
+    const declaredTotal = expectedBytes && expectedBytes > 0 ? expectedBytes : totalBytes;
+    const finalTotal = declaredTotal > 0 ? declaredTotal : array.byteLength || 1;
+    const loaded = Math.min(array.byteLength, finalTotal);
+    state.setAssetProgress(id, loaded, finalTotal);
+    if (expectedBytes && expectedBytes > 0 && array.byteLength !== expectedBytes) {
+      throw new Error('Fetched asset size mismatch; verify facilitator-provided media.');
+    }
+    return array;
+  }
+
   private sendAck(txn: string | undefined, ok: boolean, error?: string) {
     if (!txn) return;
     const ackMsg: WireMessage = {
@@ -336,6 +368,7 @@ export class ControlChannel {
     const manifestEntry = state.manifest[cmd.id];
     const total = manifestEntry?.bytes ?? baseTotal;
     const normalisedTotal = total > 0 ? total : initialTotal;
+    const expectedSha = (cmd.sha256 ?? manifestEntry?.sha256)?.toLowerCase();
 
     if (hasBuffer(cmd.id) || hadAsset) {
       state.setAssetProgress(cmd.id, normalisedTotal, normalisedTotal);
@@ -343,6 +376,53 @@ export class ControlChannel {
       state.addAsset(cmd.id, { broadcast: true });
       this.sendAck(txn, true);
       return;
+    }
+
+    const ctx = getAudioContext();
+    const useRaw = expectedSha ? getRawAssetBySha(expectedSha) : undefined;
+
+    if (useRaw || cmd.source) {
+      try {
+        const arrayBuffer = useRaw
+          ? useRaw.data.slice(0)
+          : await this.fetchAssetSource(
+              cmd.source!,
+              normalisedTotal,
+              state,
+              cmd.id,
+              cmd.bytes ?? manifestEntry?.bytes ?? undefined,
+            );
+
+        const actualSha = await digestSha256(arrayBuffer);
+        if (expectedSha && actualSha !== expectedSha) {
+          throw new Error('Asset hash mismatch; expected facilitator-provided file.');
+        }
+
+        if (!useRaw) {
+          const contentType = this.lastFetchedContentType;
+          registerRawAsset(expectedSha ?? actualSha, arrayBuffer, contentType ?? undefined);
+        }
+
+        const buffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
+        setBuffer(cmd.id, buffer);
+        state.setAssetProgress(cmd.id, normalisedTotal, normalisedTotal);
+        invalidatePlayer(cmd.id);
+        state.addAsset(cmd.id, { broadcast: true });
+        this.sendAck(txn, true);
+        return;
+      } catch (err) {
+        const message = (err as Error).message || 'Failed to load asset from facilitator source.';
+        if (previousProgress) {
+          state.setAssetProgress(cmd.id, previousProgress.loaded, previousProgress.total);
+        } else {
+          state.setAssetProgress(cmd.id, 0, normalisedTotal);
+          state.removeAsset(cmd.id, { broadcast: false });
+          removeBuffer(cmd.id);
+        }
+        this.sendAck(txn, false, message);
+        this.opts.onError?.(message);
+        return;
+      }
     }
 
     const message =
