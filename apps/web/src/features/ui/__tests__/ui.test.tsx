@@ -94,7 +94,11 @@ describe('UI components', () => {
 
   it('handles asset drop interactions with manifest guidance', async () => {
     const handleDropMock = vi.fn().mockResolvedValue(undefined);
-    vi.doMock('../../audio/assets', () => ({ handleDrop: handleDropMock }));
+    vi.doMock('../../audio/assets', () => ({
+      __esModule: true,
+      handleDrop: handleDropMock,
+      getRawAssetById: vi.fn(),
+    }));
 
     const { useSessionStore } = await import('../../../state/session');
     const { default: AssetDropZone } = await import('../AssetDropZone');

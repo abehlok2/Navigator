@@ -45,7 +45,11 @@ describe('ControlChannel message handling', () => {
       invalidate: vi.fn(),
       getPlayer: vi.fn(),
     }));
-    vi.doMock('../../audio/context', () => ({ __esModule: true, getMasterGain: vi.fn(() => ({})) }));
+    vi.doMock('../../audio/context', () => ({
+      __esModule: true,
+      getMasterGain: vi.fn(() => ({})),
+      getAudioContext: vi.fn(() => ({ decodeAudioData: vi.fn() })),
+    }));
     vi.doMock('../../audio/ducking', () => ({
       __esModule: true,
       setupSpeechDucking: vi.fn(),
@@ -122,7 +126,11 @@ describe('ControlChannel message handling', () => {
     const setLocalSpeechFallback = vi.fn();
     const hasSpeechInput = vi.fn(() => true);
 
-    vi.doMock('../../audio/context', () => ({ __esModule: true, getMasterGain: vi.fn(() => 'master-gain') }));
+    vi.doMock('../../audio/context', () => ({
+      __esModule: true,
+      getMasterGain: vi.fn(() => 'master-gain'),
+      getAudioContext: vi.fn(() => ({ decodeAudioData: vi.fn() })),
+    }));
     vi.doMock('../../audio/ducking', () => ({
       __esModule: true,
       setupSpeechDucking,
@@ -216,7 +224,11 @@ describe('ControlChannel message handling', () => {
       invalidate: vi.fn(),
       getPlayer,
     }));
-    vi.doMock('../../audio/context', () => ({ __esModule: true, getMasterGain: vi.fn(() => ({})) }));
+    vi.doMock('../../audio/context', () => ({
+      __esModule: true,
+      getMasterGain: vi.fn(() => ({})),
+      getAudioContext: vi.fn(() => ({ decodeAudioData: vi.fn() })),
+    }));
     vi.doMock('../../audio/ducking', () => ({
       __esModule: true,
       setupSpeechDucking: vi.fn(),
@@ -277,8 +289,20 @@ describe('ControlChannel message handling', () => {
       invalidate,
       getPlayer: vi.fn(),
     }));
-    vi.doMock('../../audio/assets', () => ({ __esModule: true, hasBuffer, removeBuffer }));
-    vi.doMock('../../audio/context', () => ({ __esModule: true, getMasterGain: vi.fn(() => ({})) }));
+    vi.doMock('../../audio/assets', () => ({
+      __esModule: true,
+      hasBuffer,
+      removeBuffer,
+      setBuffer: vi.fn(),
+      registerRawAsset: vi.fn(),
+      getRawAssetBySha: vi.fn(() => undefined),
+      digestSha256: vi.fn(async () => 'hash'),
+    }));
+    vi.doMock('../../audio/context', () => ({
+      __esModule: true,
+      getMasterGain: vi.fn(() => ({})),
+      getAudioContext: vi.fn(() => ({ decodeAudioData: vi.fn() })),
+    }));
     vi.doMock('../../audio/ducking', () => ({
       __esModule: true,
       setupSpeechDucking: vi.fn(),
@@ -353,8 +377,20 @@ describe('ControlChannel message handling', () => {
       invalidate,
       getPlayer: vi.fn(),
     }));
-    vi.doMock('../../audio/assets', () => ({ __esModule: true, hasBuffer, removeBuffer }));
-    vi.doMock('../../audio/context', () => ({ __esModule: true, getMasterGain: vi.fn(() => ({})) }));
+    vi.doMock('../../audio/assets', () => ({
+      __esModule: true,
+      hasBuffer,
+      removeBuffer,
+      setBuffer: vi.fn(),
+      registerRawAsset: vi.fn(),
+      getRawAssetBySha: vi.fn(() => undefined),
+      digestSha256: vi.fn(async () => 'hash'),
+    }));
+    vi.doMock('../../audio/context', () => ({
+      __esModule: true,
+      getMasterGain: vi.fn(() => ({})),
+      getAudioContext: vi.fn(() => ({ decodeAudioData: vi.fn() })),
+    }));
     vi.doMock('../../audio/ducking', () => ({
       __esModule: true,
       setupSpeechDucking: vi.fn(),
@@ -413,6 +449,125 @@ describe('ControlChannel message handling', () => {
     expect(finalState.assetProgress.tone?.loaded ?? 0).toBe(0);
   });
 
+  it('fetches and decodes assets from facilitator source when needed', async () => {
+    const invalidate = vi.fn();
+    const unload = vi.fn();
+    const seek = vi.fn();
+    const removeBuffer = vi.fn();
+    const setBuffer = vi.fn();
+    const registerRawAsset = vi.fn();
+    const getRawAssetBySha = vi.fn(() => undefined);
+    const digestSha256 = vi.fn(async () => 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    const decodeAudioData = vi.fn().mockResolvedValue({ sampleRate: 48000 } as unknown as AudioBuffer);
+
+    vi.doMock('../../audio/scheduler', () => ({
+      __esModule: true,
+      playAt: vi.fn(),
+      stop: vi.fn(),
+      crossfade: vi.fn(),
+      setGain: vi.fn(),
+      seek,
+      unload,
+      invalidate,
+      getPlayer: vi.fn(),
+    }));
+    vi.doMock('../../audio/assets', () => ({
+      __esModule: true,
+      hasBuffer: vi.fn(() => false),
+      removeBuffer,
+      setBuffer,
+      registerRawAsset,
+      getRawAssetBySha,
+      digestSha256,
+    }));
+    vi.doMock('../../audio/context', () => ({
+      __esModule: true,
+      getMasterGain: vi.fn(() => ({})),
+      getAudioContext: vi.fn(() => ({ decodeAudioData })),
+    }));
+    vi.doMock('../../audio/ducking', () => ({
+      __esModule: true,
+      setupSpeechDucking: vi.fn(),
+      cleanupSpeechDucking: vi.fn(),
+    }));
+    vi.doMock('../../audio/speech', () => ({
+      __esModule: true,
+      setLocalSpeechFallback: vi.fn(),
+      hasSpeechInput: vi.fn(() => false),
+    }));
+
+    const { useSessionStore } = await import('../../../state/session');
+    useSessionStore.setState({
+      manifest: {
+        tone: {
+          id: 'tone',
+          sha256: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          bytes: 3,
+        },
+      },
+      assets: new Set(),
+      assetProgress: {},
+    });
+    const state = useSessionStore.getState();
+    const setAssetProgressSpy = vi.spyOn(state, 'setAssetProgress');
+    const addAssetSpy = vi.spyOn(state, 'addAsset');
+
+    const array = new Uint8Array([1, 2, 3]).buffer;
+    const originalFetch = global.fetch;
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      headers: {
+        get: (name: string) => (name.toLowerCase() === 'content-type' ? 'audio/wav' : null),
+      },
+      arrayBuffer: async () => array,
+    } as any));
+    (global as any).fetch = fetchMock;
+
+    const { ControlChannel } = await import('../channel');
+
+    const dc = new FakeDataChannel();
+    const errors: string[] = [];
+    new ControlChannel(dc as unknown as RTCDataChannel, {
+      role: 'explorer',
+      roomId: 'room',
+      version: 'v1',
+      onError: err => errors.push(err),
+    });
+
+    dc.emit('message', {
+      data: JSON.stringify({
+        type: 'cmd.load',
+        txn: 'txn-load',
+        payload: {
+          id: 'tone',
+          bytes: 3,
+          sha256: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          source: 'https://example.com/tone.wav',
+        },
+      }),
+    });
+
+    await Promise.resolve();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(fetchMock).toHaveBeenCalledWith('https://example.com/tone.wav');
+    expect(decodeAudioData).toHaveBeenCalled();
+    expect(setBuffer).toHaveBeenCalledWith('tone', expect.any(Object));
+    expect(registerRawAsset).toHaveBeenCalledWith(
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      expect.any(ArrayBuffer),
+      'audio/wav',
+    );
+    expect(addAssetSpy).toHaveBeenCalled();
+    const ack = JSON.parse(dc.send.mock.calls.at(-1)?.[0] as string);
+    expect(ack.payload).toEqual({ ok: true, forTxn: 'txn-load' });
+    expect(errors).toHaveLength(0);
+    expect(setAssetProgressSpy).toHaveBeenCalledWith('tone', expect.any(Number), expect.any(Number));
+
+    (global as any).fetch = originalFetch;
+  });
+
   it('handles cmd.unload by removing local assets', async () => {
     const invalidate = vi.fn();
     const unload = vi.fn();
@@ -431,8 +586,20 @@ describe('ControlChannel message handling', () => {
       invalidate,
       getPlayer: vi.fn(),
     }));
-    vi.doMock('../../audio/assets', () => ({ __esModule: true, hasBuffer, removeBuffer }));
-    vi.doMock('../../audio/context', () => ({ __esModule: true, getMasterGain: vi.fn(() => ({})) }));
+    vi.doMock('../../audio/assets', () => ({
+      __esModule: true,
+      hasBuffer,
+      removeBuffer,
+      setBuffer: vi.fn(),
+      registerRawAsset: vi.fn(),
+      getRawAssetBySha: vi.fn(() => undefined),
+      digestSha256: vi.fn(async () => 'hash'),
+    }));
+    vi.doMock('../../audio/context', () => ({
+      __esModule: true,
+      getMasterGain: vi.fn(() => ({})),
+      getAudioContext: vi.fn(() => ({ decodeAudioData: vi.fn() })),
+    }));
     vi.doMock('../../audio/ducking', () => ({
       __esModule: true,
       setupSpeechDucking: vi.fn(),
@@ -492,8 +659,16 @@ describe('ControlChannel message handling', () => {
       __esModule: true,
       hasBuffer: vi.fn(() => true),
       removeBuffer: vi.fn(),
+      setBuffer: vi.fn(),
+      registerRawAsset: vi.fn(),
+      getRawAssetBySha: vi.fn(() => undefined),
+      digestSha256: vi.fn(async () => 'hash'),
     }));
-    vi.doMock('../../audio/context', () => ({ __esModule: true, getMasterGain: vi.fn(() => ({})) }));
+    vi.doMock('../../audio/context', () => ({
+      __esModule: true,
+      getMasterGain: vi.fn(() => ({})),
+      getAudioContext: vi.fn(() => ({ decodeAudioData: vi.fn() })),
+    }));
     vi.doMock('../../audio/ducking', () => ({
       __esModule: true,
       setupSpeechDucking: vi.fn(),
@@ -531,7 +706,11 @@ describe('ControlChannel message handling', () => {
       invalidate: vi.fn(),
       getPlayer: vi.fn(),
     }));
-    vi.doMock('../../audio/context', () => ({ __esModule: true, getMasterGain: vi.fn(() => ({})) }));
+    vi.doMock('../../audio/context', () => ({
+      __esModule: true,
+      getMasterGain: vi.fn(() => ({})),
+      getAudioContext: vi.fn(() => ({ decodeAudioData: vi.fn() })),
+    }));
     vi.doMock('../../audio/ducking', () => ({
       __esModule: true,
       setupSpeechDucking: vi.fn(),
