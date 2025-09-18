@@ -14,15 +14,7 @@ async function digestSha256(buffer: ArrayBuffer): Promise<string> {
   return toHex(hash).toLowerCase();
 }
 
-/**
- * Handles a drag/drop event, preloading any files that match the manifest.
- * The manifest is sourced from session state via asset.manifest messages.
- */
-export async function handleDrop(e: DragEvent): Promise<void> {
-  e.preventDefault();
-  const list = e.dataTransfer?.files;
-  if (!list || list.length === 0) return;
-
+async function processFiles(files: File[]): Promise<void> {
   const state = useSessionStore.getState();
   const manifestEntries = Object.values(state.manifest);
   if (manifestEntries.length === 0) {
@@ -34,7 +26,7 @@ export async function handleDrop(e: DragEvent): Promise<void> {
   const { setAssetProgress, addAsset } = state;
 
   await Promise.all(
-    Array.from(list).map(async file => {
+    files.map(async file => {
       try {
         const array = await file.arrayBuffer();
         const hash = await digestSha256(array);
@@ -53,6 +45,25 @@ export async function handleDrop(e: DragEvent): Promise<void> {
       }
     })
   );
+}
+
+/**
+ * Handles a drag/drop event, preloading any files that match the manifest.
+ * The manifest is sourced from session state via asset.manifest messages.
+ */
+export async function handleDrop(e: DragEvent): Promise<void> {
+  e.preventDefault();
+  const list = e.dataTransfer?.files;
+  if (!list || list.length === 0) return;
+
+  await handleFiles(list);
+}
+
+export async function handleFiles(files: FileList | File[]): Promise<void> {
+  const fileArray = Array.from(files);
+  if (fileArray.length === 0) return;
+
+  await processFiles(fileArray);
 }
 
 export function getBuffer(id: string): AudioBuffer | undefined {

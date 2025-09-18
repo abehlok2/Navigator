@@ -94,7 +94,11 @@ describe('UI components', () => {
 
   it('handles asset drop interactions with manifest guidance', async () => {
     const handleDropMock = vi.fn().mockResolvedValue(undefined);
-    vi.doMock('../../audio/assets', () => ({ handleDrop: handleDropMock }));
+    const handleFilesMock = vi.fn().mockResolvedValue(undefined);
+    vi.doMock('../../audio/assets', () => ({
+      handleDrop: handleDropMock,
+      handleFiles: handleFilesMock,
+    }));
 
     const { useSessionStore } = await import('../../../state/session');
     const { default: AssetDropZone } = await import('../AssetDropZone');
@@ -108,16 +112,24 @@ describe('UI components', () => {
       assets: new Set(['tone']),
     });
 
-    render(<AssetDropZone />);
+    const { container } = render(<AssetDropZone />);
 
-    const instructions = screen.getByText('Drop audio files matching: tone, chime');
+    const instructions = screen.getByText(/Drop or select audio files matching: tone, chime/);
     expect(instructions).toBeTruthy();
     expect(screen.getByText(/Loaded 1 \/ 2/)).toBeTruthy();
 
-    const dropZone = instructions.parentElement as HTMLElement;
+    const dropZone = instructions.closest('.drop-zone') as HTMLElement;
     fireEvent.drop(dropZone, { nativeEvent: { dataTransfer: {} } });
 
     expect(handleDropMock).toHaveBeenCalled();
+
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+    const testFile = new File(['a'], 'tone.wav', { type: 'audio/wav' });
+    fireEvent.change(fileInput, { target: { files: [testFile] } });
+
+    await waitFor(() => {
+      expect(handleFilesMock).toHaveBeenCalled();
+    });
   });
 
   it('prompts for recording consent and shows decline error', async () => {
