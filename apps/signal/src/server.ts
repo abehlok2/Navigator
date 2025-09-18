@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import { createServer as createHttpsServer } from 'https';
 import { createServer as createHttpServer, type IncomingMessage } from 'http';
 import { readFileSync, existsSync } from 'fs';
@@ -45,6 +46,9 @@ const TURN_CONFIG = {
 };
 
 const app = express();
+app.use(cors({
+  origin: process.env.CORS_ORIGIN?.split(',').map(origin => origin.trim()).filter(Boolean) || '*',
+}));
 app.use(express.json());
 
 const SESSION_TIMEOUT_MS = Number(process.env.SESSION_TIMEOUT_MS ?? 30 * 60 * 1000);
