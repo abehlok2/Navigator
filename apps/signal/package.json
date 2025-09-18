@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "TS_NODE_TRANSPILE_ONLY=1 node --loader ts-node/esm src/server.ts",
+    "dev": "cross-env TS_NODE_TRANSPILE_ONLY=1 node --loader ts-node/esm src/server.ts",
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
@@ -24,6 +24,7 @@
     "@types/jsonwebtoken": "^9.0.5",
     "@types/ws": "^8.5.5",
     "ts-node": "^10.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "cross-env": "^7.0.3"
   }
 }
