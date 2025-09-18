@@ -67,8 +67,8 @@ export async function startMixRecording(
   splitter.connect(leftAnalyser, 0);
   splitter.connect(rightAnalyser, 1);
 
-  const leftBuffer = new Float32Array(leftAnalyser.fftSize);
-  const rightBuffer = new Float32Array(rightAnalyser.fftSize);
+  const leftBuffer = new Float32Array(leftAnalyser.fftSize) as Float32Array<ArrayBuffer>;
+  const rightBuffer = new Float32Array(rightAnalyser.fftSize) as Float32Array<ArrayBuffer>;
 
   const recOpts: MediaRecorderOptions = {};
   if (opts.bitrate) recOpts.audioBitsPerSecond = opts.bitrate;
@@ -144,7 +144,7 @@ export async function startMixRecording(
   };
 }
 
-function analyserToDb(analyser: AnalyserNode, buffer: Float32Array): number {
+function analyserToDb(analyser: AnalyserNode, buffer: Float32Array<ArrayBuffer>): number {
   analyser.getFloatTimeDomainData(buffer);
   let sum = 0;
   for (let i = 0; i < buffer.length; i++) {
