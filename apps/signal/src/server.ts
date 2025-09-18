@@ -4,7 +4,15 @@ import { createServer as createHttpServer, type IncomingMessage } from 'http';
 import { readFileSync, existsSync } from 'fs';
 import { WebSocketServer, type WebSocket, type RawData } from 'ws';
 import rateLimit from 'express-rate-limit';
-import { authenticate, login, register, revokeToken, cleanupExpiredTokens, type AuthPayload } from './auth.js';
+import {
+  authenticate,
+  login,
+  register,
+  revokeToken,
+  cleanupExpiredTokens,
+  type AuthPayload,
+  UserExistsError,
+} from './auth.js';
 import { messageSchema, roleSchema, type Role, type WireMessage } from './types.js';
 import {
   createRoom,
@@ -64,7 +72,7 @@ function authMiddleware(requiredRole?: Role) {
   };
 }
 
-const usernameSchema = z.string().min(3).max(32).regex(/^[a-zA-Z0-9_-]+$/);
+const usernameSchema = z.string().trim().min(3).max(32).regex(/^[a-zA-Z0-9_-]+$/);
 const passwordSchema = z
   .string()
   .min(8)
@@ -73,30 +81,57 @@ const passwordSchema = z
   .regex(/[A-Z]/)
   .regex(/[0-9]/);
 const credSchema = z.object({ username: usernameSchema, password: passwordSchema, role: roleSchema.optional() });
+const loginSchema = credSchema.omit({ role: true });
+
+function formatValidationIssues(error: z.ZodError): string[] {
+  return error.errors.map(issue => issue.message);
+}
 
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10 });
 
 app.post('/register', authLimiter, async (req, res) => {
+  const parsed = credSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'invalid request', issues: formatValidationIssues(parsed.error) });
+    return;
+  }
+
+  const { username, password, role } = parsed.data;
   try {
-    const { username, password, role } = credSchema.parse(req.body);
     await register(username, password, role);
-    res.sendStatus(201);
-  } catch {
-    res.status(400).json({ error: 'invalid request or user exists' });
+    const token = await login(username, password);
+    if (!token) {
+      res.status(500).json({ error: 'failed to authenticate new user' });
+      return;
+    }
+    res.status(201).json({ token });
+  } catch (err) {
+    if (err instanceof UserExistsError) {
+      res.status(409).json({ error: 'username already exists' });
+      return;
+    }
+    console.error('Failed to register user', err);
+    res.status(500).json({ error: 'failed to register user' });
   }
 });
 
 app.post('/login', authLimiter, async (req, res) => {
+  const parsed = loginSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'invalid request', issues: formatValidationIssues(parsed.error) });
+    return;
+  }
+
   try {
-    const { username, password } = credSchema.omit({ role: true }).parse(req.body);
-    const token = await login(username, password);
+    const token = await login(parsed.data.username, parsed.data.password);
     if (!token) {
       res.status(401).json({ error: 'invalid credentials' });
       return;
     }
     res.json({ token });
-  } catch {
-    res.status(400).json({ error: 'invalid request' });
+  } catch (err) {
+    console.error('Failed to log in user', err);
+    res.status(500).json({ error: 'failed to authenticate user' });
   }
 });
 

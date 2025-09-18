@@ -18,15 +18,29 @@ const activeTokens = new Map<string, number>();
 
 let users: Record<string, StoredUser> = await loadUsers();
 
+function normalizeUsername(username: string): string {
+  return username.trim();
+}
+
+export class UserExistsError extends Error {
+  constructor(username: string) {
+    super(`User with username "${username}" already exists`);
+    this.name = 'UserExistsError';
+  }
+}
+
 export async function register(username: string, password: string, role: string = 'explorer') {
-  if (users[username]) throw new Error('user exists');
+  const normalizedUsername = normalizeUsername(username);
+  if (!normalizedUsername) throw new Error('username required');
+  if (users[normalizedUsername]) throw new UserExistsError(normalizedUsername);
   const passwordHash = await bcrypt.hash(password, 10);
-  users[username] = { username, passwordHash, role };
+  users[normalizedUsername] = { username: normalizedUsername, passwordHash, role };
   await saveUsers(users);
 }
 
 export async function login(username: string, password: string): Promise<string | null> {
-  const user = users[username];
+  const normalizedUsername = normalizeUsername(username);
+  const user = users[normalizedUsername];
   if (!user) return null;
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) return null;

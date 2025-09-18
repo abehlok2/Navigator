@@ -152,7 +152,7 @@ describe('UI components', () => {
   });
 
   it('starts recording when consent is granted', async () => {
-    const stopMock = vi.fn().mockResolvedValue(new Blob([1], { type: 'audio/webm' }));
+    const stopMock = vi.fn().mockResolvedValue(new Blob([new Uint8Array([1])], { type: 'audio/webm' }));
     const startMixRecording = vi.fn(async (_mic, consent: () => Promise<boolean>) => {
       const allowed = await consent();
       if (!allowed) return null;
