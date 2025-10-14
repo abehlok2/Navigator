@@ -739,7 +739,16 @@ describe('ControlChannel message handling', () => {
     expect(firstHello.txn).toBeDefined();
     ack(dc, firstHello.txn);
 
-    const entries = [{ id: 'tone', sha256: 'abc', bytes: 1024 }];
+    const entries = [
+      {
+        id: 'tone',
+        sha256: 'abc',
+        bytes: 1024,
+        title: 'Ambient Tone',
+        notes: 'Use for intro bed',
+        url: 'https://cdn.example.com/tone.wav',
+      },
+    ];
     const manifestPromise = channel.setManifest(entries);
     const firstManifest = JSON.parse(dc.send.mock.calls.at(-1)?.[0] as string);
     expect(firstManifest.type).toBe('asset.manifest');
