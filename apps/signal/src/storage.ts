@@ -10,6 +10,11 @@ interface StoredParticipant {
 
 export interface StoredRoom {
   id: string;
+  passwordHash?: string;
+  /**
+   * @deprecated Legacy plain-text password field. Only present when reading
+   * existing data written before password hashing was introduced.
+   */
   password?: string;
   participants: StoredParticipant[];
 }
