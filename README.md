@@ -66,6 +66,25 @@ Install dependencies:
 pnpm install
 ```
 
+### Frontend dependencies
+
+The web client relies on a modern component stack for layout, animation, and data visualization. Install the required packages in `apps/web` with npm if you are setting up the project outside of pnpm:
+
+```bash
+npm install react-router-dom framer-motion @radix-ui/react-dialog @radix-ui/react-dropdown-menu @radix-ui/react-tabs @radix-ui/react-slider recharts lucide-react
+```
+
+Installed packages include:
+
+- **react-router-dom** (v6) for client-side routing
+- **framer-motion** for declarative animations
+- **@radix-ui/react-dialog** for accessible modal foundations
+- **@radix-ui/react-dropdown-menu** for contextual menus
+- **@radix-ui/react-tabs** for tabbed navigation
+- **@radix-ui/react-slider** for audio controls
+- **recharts** for graph rendering
+- **lucide-react**, providing the shared icon set used throughout the interface
+
 ## Development
 
 ### Web interface
