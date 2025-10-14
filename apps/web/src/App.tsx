@@ -12,13 +12,11 @@ import AuthForm from './features/auth/AuthForm';
 import { useAuthStore } from './state/auth';
 import { useSessionStore } from './state/session';
 import { Button } from './components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from './components/ui/card';
+import { Badge } from './components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
+import { Input } from './components/ui/input';
+import { Label } from './components/ui/label';
+import { Select } from './components/ui/select';
 import {
   createRoom,
   joinRoom,
@@ -40,6 +38,20 @@ const formatRole = (value: Role): string => value.charAt(0).toUpperCase() + valu
 const ROLE_OPTIONS: Role[] = ['facilitator', 'explorer', 'listener'];
 type ModerationNotice = { type: 'success' | 'error'; message: string };
 type PendingModeration = { id: string; type: 'role' | 'remove' };
+
+const ChevronDownIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    aria-hidden="true"
+    focusable="false"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.5}
+    {...props}
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 8.5 10 12.5 14 8.5" />
+  </svg>
+);
 
 export default function App() {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -363,46 +375,52 @@ export default function App() {
   }
 
   return (
-    <div ref={rootRef} className="min-h-screen pb-12">
-      <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-8 px-4 pb-12 pt-8 lg:px-10">
-        <header className="rounded-3xl border border-white/10 bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 p-8 text-white shadow-[0_35px_80px_-35px_rgba(14,116,144,0.65)]">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div className="space-y-2">
-              <h1 className="text-3xl font-semibold tracking-tight lg:text-4xl">Explorer Sessions</h1>
-              <p className="max-w-2xl text-sm text-blue-50/90 lg:text-base">
-                Coordinate real-time exploration audio, manage manifests, and stay ahead of connection issues.
-              </p>
-            </div>
-            <div className="flex flex-col gap-3 text-sm lg:text-base lg:items-end">
-              <div className="flex items-center gap-3">
-                {role && isRole(role) && (
-                  <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-blue-100">
-                    {formatRole(role)}
-                  </span>
-                )}
-                <span className="font-medium text-blue-50">{username}</span>
+    <div ref={rootRef} className="relative min-h-screen overflow-hidden bg-slate-100 text-slate-900">
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.18),transparent_65%)]" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[280px] bg-gradient-to-t from-white to-transparent" />
+      <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-10 px-4 pb-16 pt-10 lg:px-12">
+        <header className="rounded-3xl border border-slate-200/80 bg-white/80 p-8 shadow-xl shadow-sky-100/60 backdrop-blur">
+          <div className="flex flex-col gap-8">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-3 text-slate-500">
+                  <Badge variant="info" className="tracking-[0.3em] text-[10px]">Explorer Ops</Badge>
+                  <span className="text-xs font-medium uppercase tracking-[0.35em] text-slate-400">Navigator Control Surface</span>
+                </div>
+                <div className="space-y-3">
+                  <h1 className="text-3xl font-semibold tracking-tight lg:text-4xl">Explorer Sessions</h1>
+                  <p className="max-w-2xl text-base leading-relaxed text-slate-600">
+                    Coordinate real-time exploration audio, manage manifests, and stay ahead of connection issues.
+                  </p>
+                </div>
+              </div>
+              <div className="flex w-full flex-col gap-4 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm sm:w-auto sm:min-w-[240px]">
+                <div className="flex items-center justify-between gap-3 text-sm text-slate-500">
+                  <span className="font-medium text-slate-900">{username}</span>
+                  {role && isRole(role) && <Badge variant="muted">{formatRole(role)}</Badge>}
+                </div>
                 <Button
                   onClick={logout}
-                  className="bg-white/20 px-5 py-2 text-sm font-medium text-white shadow-none backdrop-blur hover:bg-white/30 focus-visible:ring-offset-0"
+                  className="h-10 w-full bg-slate-900 text-sm font-medium text-white hover:bg-slate-800"
                 >
                   Logout
                 </Button>
               </div>
-              <ConnectionStatus />
             </div>
+            <ConnectionStatus />
           </div>
         </header>
-        <main className="grid flex-1 gap-6 xl:grid-cols-[2fr_1fr]">
-          <section className="space-y-6">
+        <main className="grid flex-1 gap-8 xl:grid-cols-[1.75fr_1fr]">
+          <section className="space-y-8">
             {!isListenerSession && (
-              <Card className="overflow-hidden">
-                <CardHeader className="bg-slate-50/70">
+              <Card className="shadow-lg shadow-slate-200/60">
+                <CardHeader className="border-none pb-0">
                   <CardTitle>Asset preparation</CardTitle>
                   <CardDescription>
                     Drop facilitator audio files and confirm that the explorer has every asset required for the session.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="space-y-6 pt-0">
                   <AssetDropZone />
                   <AssetAvailability />
                 </CardContent>
@@ -413,80 +431,72 @@ export default function App() {
             {isListenerSession && <ListenerPanel />}
             {!isListenerSession && <TelemetryDisplay />}
           </section>
-          <section className="space-y-6">
-            <Card className="sticky top-8">
-              <CardHeader className="bg-slate-50/70">
+          <section className="space-y-8">
+            <Card className="sticky top-8 shadow-lg shadow-slate-200/60">
+              <CardHeader className="border-none pb-0">
                 <CardTitle>Room access</CardTitle>
                 <CardDescription>
                   Create rooms, join with a password, and connect to the right participant before streaming audio.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-5">
+              <CardContent className="space-y-6 pt-0">
                 <div className="space-y-2">
-                  <label htmlFor="room-id" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Room ID
-                  </label>
-                  <input
+                  <Label htmlFor="room-id">Room ID</Label>
+                  <Input
                     id="room-id"
                     type="text"
                     value={roomId}
                     onChange={e => setRoomId(e.target.value)}
                     placeholder="Enter or paste a room identifier"
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
                   />
-                  <div className="flex flex-wrap items-center gap-3 pt-1">
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
                     <Button
                       type="button"
                       onClick={handleCreateRoom}
                       disabled={creatingRoom || !canCreateRoom}
                       title={canCreateRoom ? undefined : 'Only facilitators can create rooms'}
-                      className="bg-blue-600 px-4 py-2 text-sm hover:bg-blue-700 disabled:bg-blue-600/60"
+                      className="h-10 bg-sky-600 px-4 text-sm font-semibold text-white hover:bg-sky-700 disabled:bg-sky-400/60"
                     >
                       {creatingRoom ? 'Creating…' : 'Create Room'}
                     </Button>
-                    {!canCreateRoom && (
-                      <span className="text-xs text-slate-500">Only facilitators can create new rooms.</span>
-                    )}
+                    {!canCreateRoom && <span>Only facilitators can create new rooms.</span>}
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label htmlFor="join-password" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Join password
-                  </label>
-                  <input
+                  <Label htmlFor="join-password">Join password</Label>
+                  <Input
                     id="join-password"
                     type="password"
                     value={joinPassword}
                     onChange={e => setJoinPassword(e.target.value)}
                     placeholder="Optional room password"
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
                     autoComplete="current-password"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label htmlFor="target-id" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Connect to
-                  </label>
-                  <div className="flex flex-col gap-3 sm:flex-row">
-                    <select
-                      id="target-id"
-                      value={targetId}
-                      onChange={e => setTargetId(e.target.value)}
-                      className="w-full min-w-[200px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:text-slate-400"
-                      disabled={availableTargets.length === 0}
-                    >
-                      <option value="">Select participant…</option>
-                      {availableTargets.map(participant => (
-                        <option key={participant.id} value={participant.id}>
-                          {`${formatRole(participant.role)} — ${participant.id}`}
-                        </option>
-                      ))}
-                    </select>
+                  <Label htmlFor="target-id">Connect to</Label>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <div className="relative w-full">
+                      <Select
+                        id="target-id"
+                        value={targetId}
+                        onChange={e => setTargetId(e.target.value)}
+                        disabled={availableTargets.length === 0}
+                      >
+                        <option value="">Select participant…</option>
+                        {availableTargets.map(participant => (
+                          <option key={participant.id} value={participant.id}>
+                            {`${formatRole(participant.role)} — ${participant.id}`}
+                          </option>
+                        ))}
+                      </Select>
+                      <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    </div>
                     <Button
                       type="button"
                       onClick={loadParticipants}
                       disabled={loadingParticipants || !roomId}
-                      className="bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800 disabled:bg-slate-700/70"
+                      className="h-10 bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:bg-slate-400/70"
                     >
                       {loadingParticipants ? 'Loading…' : 'Refresh'}
                     </Button>
@@ -495,139 +505,128 @@ export default function App() {
                     Participants appear once they have joined the room. Facilitators can connect to any explorer or listener.
                   </p>
                 </div>
-                <div className="flex flex-col gap-3 rounded-2xl bg-slate-50/60 p-4">
+                <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
                   <Button
                     type="button"
                     onClick={handleConnect}
                     disabled={connecting || !targetId}
-                    className="w-full justify-center bg-emerald-500 px-4 py-2 text-sm font-semibold hover:bg-emerald-600 disabled:bg-emerald-500/60"
+                    className="h-11 w-full justify-center bg-emerald-500 text-sm font-semibold text-white hover:bg-emerald-600 disabled:bg-emerald-300/70"
                   >
                     {connecting ? 'Connecting…' : 'Connect'}
                   </Button>
-                  <div className="flex flex-col items-start gap-2 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col gap-2 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
                     <span>
                       {participantId ? `Participant ID: ${participantId}` : 'No active participant connection yet.'}
                     </span>
-                    {error && <span className="font-medium text-red-600">{error}</span>}
+                    {error && <span className="font-medium text-rose-600">{error}</span>}
                   </div>
                 </div>
               </CardContent>
             </Card>
             {(participants.length > 0 || canModerateParticipants) && (
-              <Card>
-                <CardHeader className="bg-slate-50/70">
-                  <CardTitle>Participant oversight</CardTitle>
-                  <CardDescription>
-                    Monitor presence and adjust roles or security to keep the room organised.
-                  </CardDescription>
+              <Card className="space-y-0 shadow-lg shadow-slate-200/60">
+                <CardHeader className="border-none pb-0">
+                  <CardTitle>Participants</CardTitle>
+                  <CardDescription>Review the room roster and update roles or access in real time.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-5 text-sm text-slate-700">
+                <CardContent className="space-y-6 pt-0">
                   {canModerateParticipants && (
-                    <div className="space-y-2">
-                      <label htmlFor="room-password" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Room password
-                      </label>
-                      <div className="flex flex-col gap-3 sm:flex-row">
-                        <input
-                          id="room-password"
-                          type="password"
-                          value={roomPassword}
-                          onChange={e => setRoomPasswordInput(e.target.value)}
-                          placeholder="Set or clear the room password"
-                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:text-slate-400"
-                          disabled={settingPassword}
-                        />
-                        <Button
-                          type="button"
-                          onClick={handleSetRoomPassword}
-                          disabled={settingPassword || !roomId}
-                          className="bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-blue-600/60"
-                        >
-                          {settingPassword ? 'Saving…' : 'Save'}
-                        </Button>
+                    <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="room-password" className="text-sm font-semibold text-slate-600">
+                          Room password
+                        </Label>
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                          <Input
+                            id="room-password"
+                            type="text"
+                            value={roomPassword}
+                            onChange={e => setRoomPasswordInput(e.target.value)}
+                            placeholder="Set or clear the room password"
+                            disabled={settingPassword}
+                          />
+                          <Button
+                            type="button"
+                            onClick={handleSetRoomPassword}
+                            disabled={settingPassword || !roomId}
+                            className="h-10 bg-sky-600 px-4 text-sm font-semibold text-white hover:bg-sky-700 disabled:bg-sky-400/60"
+                          >
+                            {settingPassword ? 'Saving…' : 'Save'}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-slate-500">Leave the field blank and save to remove the password.</p>
                       </div>
-                      <p className="text-xs text-slate-500">Leave the field blank and save to remove the password.</p>
-                    </div>
-                  )}
-                  {canModerateParticipants && moderationNotice && (
-                    <div
-                      className={
-                        moderationNotice.type === 'error'
-                          ? 'text-sm font-medium text-red-600'
-                          : 'text-sm font-medium text-emerald-600'
-                      }
-                    >
-                      {moderationNotice.message}
+                      {moderationNotice && (
+                        <div
+                          className={
+                            moderationNotice.type === 'error'
+                              ? 'rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700'
+                              : 'rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700'
+                          }
+                        >
+                          {moderationNotice.message}
+                        </div>
+                      )}
                     </div>
                   )}
                   {participants.length > 0 ? (
-                    <ul className="space-y-3">
+                    <ul className="space-y-4">
                       {participants.map(participant => {
                         const isSelfParticipant = participantId === participant.id;
                         const isPending = pendingModeration?.id === participant.id;
                         const isRemoving = isPending && pendingModeration?.type === 'remove';
                         const isUpdatingRole = isPending && pendingModeration?.type === 'role';
+                        const selectId = `participant-${participant.id}-role`;
                         return (
                           <li
                             key={participant.id}
-                            className="rounded-2xl border border-slate-200/80 bg-white/70 p-4 shadow-sm"
+                            className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm"
                           >
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                              <div className="flex flex-wrap items-center gap-2 text-sm">
-                                <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-blue-700">
-                                  {formatRole(participant.role)}
-                                </span>
-                                <span className="font-mono text-[12px] text-slate-500">{participant.id}</span>
-                                {isSelfParticipant && (
-                                  <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600">
-                                    You
-                                  </span>
-                                )}
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
+                                <Badge variant="info">{formatRole(participant.role)}</Badge>
+                                <span className="font-mono text-xs text-slate-500">{participant.id}</span>
+                                {isSelfParticipant && <Badge variant="muted">You</Badge>}
                               </div>
-                              <span
-                                className={
-                                  participant.connected
-                                    ? 'text-sm font-medium text-emerald-600'
-                                    : 'text-sm font-medium text-slate-400'
-                                }
-                              >
+                              <Badge variant={participant.connected ? 'success' : 'muted'}>
                                 {participant.connected ? 'Connected' : 'Offline'}
-                              </span>
+                              </Badge>
                             </div>
                             {canModerateParticipants && (
-                              <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                <label className="flex items-center gap-3 text-xs font-medium uppercase tracking-wide text-slate-500">
-                                  Role
-                                  <select
-                                    value={participant.role}
-                                    onChange={e => {
-                                      const nextRole = e.target.value as Role;
-                                      if (nextRole !== participant.role && !isSelfParticipant) {
-                                        handleParticipantRoleChange(participant.id, nextRole);
-                                      }
-                                    }}
-                                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm text-slate-700 shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:text-slate-400"
-                                    disabled={isPending || isSelfParticipant}
-                                  >
-                                    {ROLE_OPTIONS.map(option => (
-                                      <option key={option} value={option}>
-                                        {formatRole(option)}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </label>
-                                <div className="flex items-center gap-3">
+                              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                                  <Label htmlFor={selectId}>Role</Label>
+                                  <div className="relative w-full sm:w-[200px]">
+                                    <Select
+                                      id={selectId}
+                                      value={participant.role}
+                                      onChange={e => {
+                                        const nextRole = e.target.value as Role;
+                                        if (nextRole !== participant.role && !isSelfParticipant) {
+                                          handleParticipantRoleChange(participant.id, nextRole);
+                                        }
+                                      }}
+                                      disabled={isPending || isSelfParticipant}
+                                    >
+                                      {ROLE_OPTIONS.map(option => (
+                                        <option key={option} value={option}>
+                                          {formatRole(option)}
+                                        </option>
+                                      ))}
+                                    </Select>
+                                    <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                  </div>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-3">
                                   <Button
                                     type="button"
                                     onClick={() => handleRemoveParticipant(participant.id)}
                                     disabled={isPending || isSelfParticipant}
-                                    className="bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600 disabled:bg-red-500/60"
+                                    className="h-9 bg-rose-500 px-3 text-xs font-semibold text-white hover:bg-rose-600 disabled:bg-rose-300/70"
                                   >
                                     {isRemoving ? 'Removing…' : 'Remove'}
                                   </Button>
-                                  {isUpdatingRole && (
-                                    <span className="text-xs text-slate-500">Updating role…</span>
-                                  )}
+                                  {isUpdatingRole && <span className="text-xs text-slate-500">Updating role…</span>}
                                   {isSelfParticipant && (
                                     <span className="text-xs text-slate-500">You cannot modify your own entry.</span>
                                   )}
@@ -639,7 +638,9 @@ export default function App() {
                       })}
                     </ul>
                   ) : (
-                    <div className="text-sm text-slate-500">No participants in this room yet.</div>
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-6 text-sm text-slate-500">
+                      No participants in this room yet.
+                    </div>
                   )}
                 </CardContent>
               </Card>
