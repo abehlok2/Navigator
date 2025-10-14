@@ -1,25 +1,29 @@
 import React from 'react';
-import { Badge } from '../../components/ui/badge';
+import { StatusIndicator, type StatusIndicatorStatus } from '../../components/ui/status-indicator';
 import { cn } from '../../lib/utils';
 import { useSessionStore } from '../../state/session';
 
 const STATUS_STYLE: Record<
   'connected' | 'connecting' | 'disconnected',
-  { label: string; description: string; badgeVariant: 'success' | 'info' | 'destructive' }
+  {
+    label: string;
+    description: string;
+    indicatorStatus: StatusIndicatorStatus;
+  }
 > = {
   connected: {
     label: 'Connected',
-    badgeVariant: 'success',
+    indicatorStatus: 'connected',
     description: 'Media and control channels are active.',
   },
   connecting: {
     label: 'Connecting…',
-    badgeVariant: 'info',
+    indicatorStatus: 'connecting',
     description: 'Negotiating session details—stay on this page.',
   },
   disconnected: {
     label: 'Disconnected',
-    badgeVariant: 'destructive',
+    indicatorStatus: 'disconnected',
     description: 'Reconnect to begin streaming audio.',
   },
 };
@@ -41,9 +45,7 @@ export default function ConnectionStatus() {
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/80 p-4 text-slate-700 shadow-sm">
       <div className="flex flex-wrap items-center gap-3">
-        <Badge variant={status.badgeVariant} className="text-[11px] tracking-wide">
-          {status.label}
-        </Badge>
+        <StatusIndicator status={status.indicatorStatus} label={status.label} size="md" />
         <span className="text-sm text-slate-600">{status.description}</span>
       </div>
       <div className={cn('text-xs font-medium', heartbeatTone)}>
