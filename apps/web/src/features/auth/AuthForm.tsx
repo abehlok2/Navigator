@@ -4,7 +4,6 @@ import { Button } from '../../components/ui/button';
 import { apiUrl } from '../../config';
 
 const USERNAME_PATTERN = /^[a-zA-Z0-9_-]{3,32}$/;
-const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9]).{8,128}$/;
 
 function decodeJwtPayload(token: string): { username?: string; role?: string } | null {
   try {
@@ -34,8 +33,8 @@ export default function AuthForm() {
     if (!USERNAME_PATTERN.test(trimmedUsername)) {
       return 'Usernames must be 3-32 characters and can include letters, numbers, underscores, or hyphens.';
     }
-    if (!PASSWORD_PATTERN.test(password)) {
-      return 'Passwords must be 8-128 characters and include at least one uppercase letter, one lowercase letter, and one number.';
+    if (password.length < 8 || password.length > 128) {
+      return 'Passwords must be between 8 and 128 characters.';
     }
     if (mode === 'register' && password !== confirmPassword) {
       return 'Passwords do not match.';
@@ -118,64 +117,70 @@ export default function AuthForm() {
   };
 
   return (
-    <div className="mx-auto max-w-sm p-4">
-      <h2 className="mb-4 text-xl font-semibold">
-        {mode === 'login' ? 'Login' : 'Create Account'}
-      </h2>
-      <form onSubmit={handleSubmit} className="space-y-2">
-        <input
-          type="text"
-          placeholder="Username"
-          value={username}
-          onChange={e => setUsername(e.target.value)}
-          className="w-full rounded border border-gray-300 p-2"
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          className="w-full rounded border border-gray-300 p-2"
-        />
-        {mode === 'register' && (
+    <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-8">
+      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-lg">
+        <h2 className="mb-6 text-center text-2xl font-semibold">
+          {mode === 'login' ? 'Login' : 'Create Account'}
+        </h2>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <input
+            type="text"
+            placeholder="Username"
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+            className="w-full rounded border border-gray-300 p-3"
+          />
           <input
             type="password"
-            placeholder="Confirm Password"
-            value={confirmPassword}
-            onChange={e => setConfirmPassword(e.target.value)}
-            className="w-full rounded border border-gray-300 p-2"
+            placeholder="Password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            className="w-full rounded border border-gray-300 p-3"
           />
-        )}
-        {mode === 'register' && (
-          <select
-            value={role}
-            onChange={e => setRole(e.target.value as 'explorer' | 'facilitator' | 'listener')}
-            className="w-full rounded border border-gray-300 p-2"
-          >
-            <option value="explorer">Explorer</option>
-            <option value="facilitator">Facilitator</option>
-            <option value="listener">Listener</option>
-          </select>
-        )}
-        <p className="text-sm text-gray-500">
-          Passwords must include upper- and lower-case letters and at least one number.
-        </p>
-        {error && <div className="whitespace-pre-wrap text-sm text-red-500">{error}</div>}
-        <Button type="submit" className="w-full" disabled={submitting}>
-          {submitting ? (mode === 'login' ? 'Logging in…' : 'Registering…') : mode === 'login' ? 'Login' : 'Register'}
+          {mode === 'register' && (
+            <input
+              type="password"
+              placeholder="Confirm Password"
+              value={confirmPassword}
+              onChange={e => setConfirmPassword(e.target.value)}
+              className="w-full rounded border border-gray-300 p-3"
+            />
+          )}
+          {mode === 'register' && (
+            <select
+              value={role}
+              onChange={e => setRole(e.target.value as 'explorer' | 'facilitator' | 'listener')}
+              className="w-full rounded border border-gray-300 p-3"
+            >
+              <option value="explorer">Explorer</option>
+              <option value="facilitator">Facilitator</option>
+              <option value="listener">Listener</option>
+            </select>
+          )}
+          <p className="text-sm text-gray-500">Passwords must be between 8 and 128 characters.</p>
+          {error && <div className="whitespace-pre-wrap text-sm text-red-500">{error}</div>}
+          <Button type="submit" className="w-full" disabled={submitting}>
+            {submitting
+              ? mode === 'login'
+                ? 'Logging in…'
+                : 'Registering…'
+              : mode === 'login'
+                ? 'Login'
+                : 'Register'}
+          </Button>
+        </form>
+        <Button
+          type="button"
+          onClick={() => {
+            setMode(mode === 'login' ? 'register' : 'login');
+            setError(null);
+            setConfirmPassword('');
+          }}
+          className="mt-4 w-full bg-transparent text-blue-600 hover:bg-blue-50"
+        >
+          {mode === 'login' ? 'Need an account? Register' : 'Have an account? Login'}
         </Button>
-      </form>
-      <Button
-        type="button"
-        onClick={() => {
-          setMode(mode === 'login' ? 'register' : 'login');
-          setError(null);
-          setConfirmPassword('');
-        }}
-        className="mt-2 w-full bg-transparent text-blue-600 hover:bg-blue-50"
-      >
-        {mode === 'login' ? 'Need an account? Register' : 'Have an account? Login'}
-      </Button>
+      </div>
     </div>
   );
 }
