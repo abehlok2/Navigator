@@ -48,6 +48,10 @@ Adjust the values as needed for your environment.
 
 Navigator is a monorepo designed to facilitate consciousness exploration. It contains a web interface and a signal processing server.
 
+## User Guide
+
+See [docs/user-guide.md](docs/user-guide.md) for a role-based guide that covers setup, running the stack, and facilitating live sessions.
+
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) (v18 or newer)
@@ -87,6 +91,10 @@ or export the variables when running commands:
 VITE_API_URL=http://your-host:8080 \
 VITE_SIGNAL_URL=ws://your-host:8080 pnpm dev:web
 ```
+
+#### Audio asset preparation
+
+The web client only plays audio that has been supplied locally by the facilitator. Import assets through the manifest editor or drop zone after distributing the files to explorers (for example via USB drive or shared local storage). Remote URLs in manifests are treated as legacy metadata and are not fetched by the application.
 
 ### Signal server
 

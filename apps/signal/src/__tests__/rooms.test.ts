@@ -57,6 +57,25 @@ describe('rooms', () => {
     setPassword(room.id, 'secret');
     expect(verifyPassword(room.id, 'secret')).toBe(true);
     expect(verifyPassword(room.id, 'wrong')).toBe(false);
+    expect(roomStore[room.id].passwordHash).toBeDefined();
+    expect(roomStore[room.id].passwordHash).not.toEqual('secret');
+    expect(roomStore[room.id]).not.toHaveProperty('password');
+  });
+
+  it('migrates legacy plain-text room passwords to hashes', async () => {
+    roomStore = {
+      legacy: {
+        id: 'legacy',
+        password: 'secret',
+        participants: [],
+      },
+    };
+
+    const { verifyPassword, getRoom } = await import('../rooms.ts');
+    expect(verifyPassword('legacy', 'secret')).toBe(true);
+    expect(roomStore.legacy.passwordHash).toBeDefined();
+    expect(roomStore.legacy).not.toHaveProperty('password');
+    expect(getRoom('legacy')?.passwordHash).toBeDefined();
   });
 
   it('kicks participant and closes socket', async () => {

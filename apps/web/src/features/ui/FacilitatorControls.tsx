@@ -1,5 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button } from '../../components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '../../components/ui/card';
 import { useSessionStore } from '../../state/session';
+import { getRawAssetById } from '../audio/assets';
 import ManifestEditor from './ManifestEditor';
 
 type EntryStatusPhase = 'idle' | 'loading' | 'unloading' | 'success' | 'error';
@@ -20,8 +29,6 @@ export default function FacilitatorControls() {
   const manifestEntries = useMemo(() => Object.values(manifest), [manifest]);
   const remoteAssetSet = remoteAssets;
   const remoteMissingSet = remoteMissing;
-
-  const [sources, setSources] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<Record<string, EntryStatus>>({});
 
   const [gain, setGain] = useState<Record<string, number>>({});
@@ -71,29 +78,36 @@ export default function FacilitatorControls() {
       });
       return next;
     });
-    setSources(prev => {
-      const entries = Object.entries(prev).filter(([id]) => validIds.has(id));
-      if (entries.length === Object.keys(prev).length) {
-        return prev;
-      }
-      return Object.fromEntries(entries);
-    });
   }, [manifestEntries]);
 
   const updateStatus = useCallback((id: string, next: EntryStatus) => {
     setStatus(prev => ({ ...prev, [id]: next }));
   }, []);
 
+  const toDataUrl = useCallback((data: ArrayBuffer, mimeType?: string) => {
+    const bytes = new Uint8Array(data);
+    let base64: string;
+    if (typeof globalThis.btoa === 'function') {
+      let binary = '';
+      bytes.forEach(b => {
+        binary += String.fromCharCode(b);
+      });
+      base64 = globalThis.btoa(binary);
+    } else {
+      const bufferCtor = (globalThis as any).Buffer as
+        | { from(data: Uint8Array): { toString(encoding: string): string } }
+        | undefined;
+      if (!bufferCtor) {
+        throw new Error('No base64 encoder available in this environment.');
+      }
+      base64 = bufferCtor.from(bytes).toString('base64');
+    }
+    const type = mimeType && mimeType.trim() ? mimeType : 'application/octet-stream';
+    return `data:${type};base64,${base64}`;
+  }, []);
+
   const handleLoad = useCallback(
     async (entryId: string, sha256?: string, bytes?: number) => {
-      const source = sources[entryId]?.trim();
-      if (!source) {
-        updateStatus(entryId, {
-          phase: 'error',
-          message: 'Provide a source URL before loading.',
-        });
-        return;
-      }
       if (!control) {
         updateStatus(entryId, {
           phase: 'error',
@@ -103,7 +117,9 @@ export default function FacilitatorControls() {
       }
       updateStatus(entryId, { phase: 'loading', message: 'Sending load command…' });
       try {
-        await control.load({ id: entryId, source, sha256, bytes });
+        const stored = getRawAssetById(entryId);
+        const source = stored ? toDataUrl(stored.data, stored.mimeType) : undefined;
+        await control.load({ id: entryId, sha256, bytes, ...(source ? { source } : {}) });
         updateStatus(entryId, { phase: 'success', message: 'Load command acknowledged.' });
       } catch (err) {
         updateStatus(entryId, {
@@ -112,7 +128,7 @@ export default function FacilitatorControls() {
         });
       }
     },
-    [control, sources, updateStatus]
+    [control, toDataUrl, updateStatus]
   );
 
   const handleUnload = useCallback(
@@ -183,57 +199,65 @@ export default function FacilitatorControls() {
     }
   };
 
+  const inlineButtonClass =
+    'rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40';
+
+  const statusTone = (phase?: EntryStatusPhase) => {
+    switch (phase) {
+      case 'loading':
+      case 'unloading':
+        return 'text-xs font-medium text-sky-600';
+      case 'success':
+        return 'text-xs font-medium text-emerald-600';
+      case 'error':
+        return 'text-xs font-medium text-rose-600';
+      default:
+        return 'text-xs text-slate-500';
+    }
+  };
+
+  const loadedEntries = manifestEntries.filter(entry => remoteAssetSet.has(entry.id));
+
   return (
-    <div className="section space-y-4">
-      <h2>Facilitator Controls</h2>
-      <ManifestEditor />
-      <ul className="space-y-4">
-        {manifestEntries.map(entry => {
-          const id = entry.id;
-          const sourceValue = sources[id] ?? '';
-          const entryStatus = status[id];
-          const canLoad = !remoteAssetSet.has(id) && entryStatus?.phase !== 'loading';
-          const canUnload = remoteAssetSet.has(id) && entryStatus?.phase !== 'unloading';
-          const explorerStatus = remoteAssetSet.has(id)
-            ? 'Explorer: Loaded'
-            : remoteMissingSet.has(id)
-              ? 'Explorer: Missing'
-              : 'Explorer: Unknown';
-          const statusClass = (() => {
-            switch (entryStatus?.phase) {
-              case 'loading':
-              case 'unloading':
-                return 'text-xs text-blue-600';
-              case 'success':
-                return 'text-xs text-green-600';
-              case 'error':
-                return 'text-xs text-red-600';
-              default:
-                return 'text-xs text-gray-500';
-            }
-          })();
-          return (
-            <li key={id} className="rounded border border-gray-200 p-3">
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{id}</span>
-                  <span className="text-xs text-gray-500">{entry.bytes?.toLocaleString()} bytes</span>
-                </div>
-                <div className="text-xs text-gray-600">{explorerStatus}</div>
-                <div className="flex flex-col gap-2 md:flex-row md:items-center">
-                  <input
-                    type="url"
-                    value={sourceValue}
-                    placeholder="https://example.com/path/to/audio.wav"
-                    onChange={e => setSources(prev => ({ ...prev, [id]: e.target.value }))}
-                    className="w-full rounded border border-gray-300 p-2 text-sm"
-                  />
+    <Card className="overflow-hidden">
+      <CardHeader className="bg-slate-50/70">
+        <CardTitle>Facilitator console</CardTitle>
+        <CardDescription>
+          Curate manifest entries, trigger playback on the explorer, and tune the automatic ducking envelope.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="rounded-2xl border border-slate-200/80 bg-white/70 p-4 shadow-sm">
+          <ManifestEditor />
+        </div>
+        <ul className="space-y-4">
+          {manifestEntries.map(entry => {
+            const id = entry.id;
+            const entryStatus = status[id];
+            const canLoad = !remoteAssetSet.has(id) && entryStatus?.phase !== 'loading';
+            const canUnload = remoteAssetSet.has(id) && entryStatus?.phase !== 'unloading';
+            const explorerStatus = remoteAssetSet.has(id)
+              ? 'Explorer reports asset is loaded.'
+              : remoteMissingSet.has(id)
+                ? 'Explorer reports asset is missing.'
+                : 'Explorer has not confirmed receipt yet.';
+
+            return (
+              <li key={id} className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-800">{id}</div>
+                    <div className="text-xs text-slate-500">
+                      {entry.bytes ? `${entry.bytes.toLocaleString()} bytes` : 'Unknown size'}
+                    </div>
+                    <div className="mt-2 text-xs text-slate-500">{explorerStatus}</div>
+                  </div>
                   <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => handleLoad(id, entry.sha256, entry.bytes)}
                       disabled={!canLoad || !control}
-                      className="rounded border border-gray-300 px-2 py-1 disabled:opacity-50"
+                      className={inlineButtonClass}
                     >
                       Load
                     </button>
@@ -241,66 +265,96 @@ export default function FacilitatorControls() {
                       type="button"
                       onClick={() => handleUnload(id)}
                       disabled={!canUnload || !control}
-                      className="rounded border border-gray-300 px-2 py-1 disabled:opacity-50"
+                      className={inlineButtonClass}
                     >
                       Unload
                     </button>
                   </div>
                 </div>
-                {entryStatus?.message && <div className={statusClass}>{entryStatus.message}</div>}
-                <div className="flex flex-wrap items-center gap-2 text-sm">
-                  <button
-                    type="button"
-                    onClick={() => handlePlay(id)}
-                    disabled={!remoteAssetSet.has(id) || !control}
-                    className="rounded border border-gray-300 px-2 py-1 disabled:opacity-50"
-                  >
-                    Play
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleStop(id)}
-                    disabled={!remoteAssetSet.has(id) || !control}
-                    className="rounded border border-gray-300 px-2 py-1 disabled:opacity-50"
-                  >
-                    Stop
-                  </button>
-                  <label className="flex items-center gap-2">
-                    <span className="text-xs uppercase text-gray-500">Gain</span>
-                    <input
-                      type="range"
-                      min={-60}
-                      max={6}
-                      step={1}
-                      value={gain[id] ?? 0}
-                      onChange={e => handleGain(id, Number(e.target.value))}
+                {entryStatus?.message && <div className={statusTone(entryStatus.phase)}>{entryStatus.message}</div>}
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
+                    <button
+                      type="button"
+                      onClick={() => handlePlay(id)}
                       disabled={!remoteAssetSet.has(id) || !control}
-                    />
-                    <span className="w-14 text-right text-xs">{(gain[id] ?? 0).toFixed(0)} dB</span>
+                      className={inlineButtonClass}
+                    >
+                      Play
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleStop(id)}
+                      disabled={!remoteAssetSet.has(id) || !control}
+                      className={inlineButtonClass}
+                    >
+                      Stop
+                    </button>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
+                      Remote {remoteAssetSet.has(id) ? 'ready' : 'pending'}
+                    </span>
+                  </div>
+                  <label className="flex w-full flex-col gap-2 text-xs text-slate-500 sm:max-w-md">
+                    <span className="font-semibold uppercase tracking-wide text-slate-400">Gain</span>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min={-60}
+                        max={6}
+                        step={1}
+                        value={gain[id] ?? 0}
+                        onChange={e => handleGain(id, Number(e.target.value))}
+                        disabled={!remoteAssetSet.has(id) || !control}
+                        className="h-1.5 flex-1 appearance-none rounded-full bg-slate-200 accent-blue-600 disabled:opacity-50"
+                      />
+                      <span className="w-16 text-right text-xs font-semibold text-slate-600">
+                        {(gain[id] ?? 0).toFixed(0)} dB
+                      </span>
+                    </div>
                   </label>
                 </div>
+              </li>
+            );
+          })}
+        </ul>
+        {loadedEntries.length >= 2 && (
+          <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white/70 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold text-slate-700">Quick crossfade</div>
+              <div className="text-xs text-slate-500">
+                Trigger a 2-second crossfade between the first two loaded assets on the explorer.
               </div>
-            </li>
-          );
-        })}
-      </ul>
-      {manifestEntries.filter(entry => remoteAssetSet.has(entry.id)).length >= 2 && (
-        <div style={{ marginTop: '0.5rem' }}>
-          <button onClick={handleCrossfade}>Crossfade first two</button>
-        </div>
-      )}
-      <div style={{ marginTop: '0.5rem' }}>
-        <label>
-          <input type="checkbox" checked={duck} onChange={toggleDucking} /> Enable ducking
-        </label>
-        <div className="mt-2 space-y-2 text-sm text-gray-600">
-          <div>
-            Facilitator speech is mixed with the local microphone fallback before driving the
-            ducking detector.
+            </div>
+            <Button
+              type="button"
+              onClick={handleCrossfade}
+              className="bg-indigo-500 px-4 py-2 text-sm font-semibold hover:bg-indigo-600"
+            >
+              Crossfade now
+            </Button>
           </div>
-          <div className="flex flex-col gap-2">
-            <label className="flex items-center gap-2">
-              <span className="w-32">Threshold</span>
+        )}
+        <div className="rounded-2xl border border-slate-200/80 bg-white/70 p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold text-slate-700">Automatic ducking</div>
+              <div className="text-xs text-slate-500">
+                Remote speech is mixed with the local microphone fallback before driving ducking.
+              </div>
+            </div>
+            <label className="flex items-center gap-3 text-sm font-semibold text-slate-700">
+              <input
+                type="checkbox"
+                checked={duck}
+                onChange={toggleDucking}
+                className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              Enable ducking
+            </label>
+          </div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Threshold
               <input
                 type="range"
                 min={-80}
@@ -309,11 +363,12 @@ export default function FacilitatorControls() {
                 value={threshold}
                 onChange={e => updateThreshold(Number(e.target.value))}
                 disabled={!control}
+                className="h-1.5 appearance-none rounded-full bg-slate-200 accent-emerald-600 disabled:opacity-50"
               />
-              <span className="w-16 text-right">{threshold} dBFS</span>
+              <span className="text-sm font-medium text-slate-600">{threshold} dBFS</span>
             </label>
-            <label className="flex items-center gap-2">
-              <span className="w-32">Reduction</span>
+            <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Reduction
               <input
                 type="range"
                 min={-24}
@@ -322,15 +377,16 @@ export default function FacilitatorControls() {
                 value={reduction}
                 onChange={e => updateReduction(Number(e.target.value))}
                 disabled={!control}
+                className="h-1.5 appearance-none rounded-full bg-slate-200 accent-emerald-600 disabled:opacity-50"
               />
-              <span className="w-16 text-right">{reduction} dB</span>
+              <span className="text-sm font-medium text-slate-600">{reduction} dB</span>
             </label>
-            <div className="text-xs text-gray-500">
-              Attack {attackMs} ms · Release {releaseMs} ms
-            </div>
+          </div>
+          <div className="mt-3 text-xs text-slate-500">
+            Attack {attackMs} ms · Release {releaseMs} ms
           </div>
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

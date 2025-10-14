@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 type StoredRoom = {
   id: string;
-  password?: string;
+  passwordHash?: string;
   participants: { id: string; role: string }[];
 };
 

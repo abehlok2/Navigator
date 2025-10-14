@@ -33,12 +33,13 @@ export interface JoinResponse {
 export async function joinRoom(
   roomId: string,
   role: Role,
-  token: string
+  token: string,
+  password?: string
 ): Promise<JoinResponse> {
   const res = await fetch(apiUrl(`/rooms/${roomId}/join`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
-    body: JSON.stringify({ role }),
+    body: JSON.stringify(password ? { role, password } : { role }),
   });
   if (!res.ok) throw new Error('failed to join room');
   const data = (await res.json()) as {
@@ -75,7 +76,7 @@ export async function listParticipants(roomId: string, token: string): Promise<P
 }
 
 export async function setRoomPassword(roomId: string, token: string, password?: string): Promise<void> {
-  const res = await fetch(`${BASE_URL}/rooms/${roomId}/password`, {
+  const res = await fetch(apiUrl(`/rooms/${roomId}/password`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
     body: JSON.stringify(password ? { password } : {}),
@@ -89,7 +90,7 @@ export async function updateParticipantRole(
   role: Role,
   token: string
 ): Promise<void> {
-  const res = await fetch(`${BASE_URL}/rooms/${roomId}/role`, {
+  const res = await fetch(apiUrl(`/rooms/${roomId}/role`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
     body: JSON.stringify({ participantId, role }),
@@ -102,7 +103,7 @@ export async function removeRoomParticipant(
   participantId: string,
   token: string
 ): Promise<void> {
-  const res = await fetch(`${BASE_URL}/rooms/${roomId}/kick`, {
+  const res = await fetch(apiUrl(`/rooms/${roomId}/kick`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
     body: JSON.stringify({ participantId }),

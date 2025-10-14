@@ -2,6 +2,7 @@ import { getAudioContext } from './context';
 import { useSessionStore } from '../../state/session';
 
 const buffers = new Map<string, AudioBuffer>();
+const rawAssetsBySha = new Map<string, { data: ArrayBuffer; mimeType?: string }>();
 
 function toHex(bytes: ArrayBuffer): string {
   return Array.from(new Uint8Array(bytes))
@@ -9,9 +10,32 @@ function toHex(bytes: ArrayBuffer): string {
     .join('');
 }
 
-async function digestSha256(buffer: ArrayBuffer): Promise<string> {
+export async function digestSha256(buffer: ArrayBuffer): Promise<string> {
   const hash = await crypto.subtle.digest('SHA-256', buffer);
   return toHex(hash).toLowerCase();
+}
+
+function normaliseSha(value?: string) {
+  return value?.toLowerCase() ?? '';
+}
+
+export function registerRawAsset(sha256: string | undefined, data: ArrayBuffer, mimeType?: string) {
+  const key = normaliseSha(sha256);
+  if (!key) return;
+  rawAssetsBySha.set(key, { data, mimeType });
+}
+
+export function getRawAssetBySha(sha256: string | undefined) {
+  const key = normaliseSha(sha256);
+  if (!key) return undefined;
+  return rawAssetsBySha.get(key);
+}
+
+export function getRawAssetById(id: string) {
+  const state = useSessionStore.getState();
+  const entry = state.manifest[id];
+  if (!entry?.sha256) return undefined;
+  return getRawAssetBySha(entry.sha256);
 }
 
 /**
@@ -38,6 +62,7 @@ export async function handleDrop(e: DragEvent): Promise<void> {
       try {
         const array = await file.arrayBuffer();
         const hash = await digestSha256(array);
+        registerRawAsset(hash, array, file.type || undefined);
         const entry =
           manifestEntries.find(item => item.sha256.toLowerCase() === hash) ??
           manifestEntries.find(item => item.id === file.name);
@@ -69,30 +94,4 @@ export function removeBuffer(id: string) {
 
 export function hasBuffer(id: string): boolean {
   return buffers.has(id);
-}
-
-export async function loadRemoteAsset({
-  id,
-  source,
-  sha256,
-}: {
-  id: string;
-  source: string;
-  sha256?: string;
-}): Promise<{ buffer: AudioBuffer; bytes: number }> {
-  const response = await fetch(source);
-  if (!response.ok) {
-    throw new Error(`failed to fetch asset ${id}: ${response.status} ${response.statusText}`);
-  }
-  const array = await response.arrayBuffer();
-  if (sha256) {
-    const digest = await digestSha256(array.slice(0));
-    if (digest !== sha256.toLowerCase()) {
-      throw new Error(`sha256 mismatch for asset ${id}`);
-    }
-  }
-  const ctx = getAudioContext();
-  const buffer = await ctx.decodeAudioData(array.slice(0));
-  setBuffer(id, buffer);
-  return { buffer, bytes: array.byteLength };
 }

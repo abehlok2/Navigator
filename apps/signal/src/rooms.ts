@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 import type { Role } from './types.js';
 import type { WebSocket } from 'ws';
 import { loadRooms, saveRooms, type StoredRoom } from './storage.js';
@@ -13,7 +13,7 @@ export interface Participant {
 export interface Room {
   id: string;
   participants: Map<string, Participant>;
-  password?: string;
+  passwordHash?: string;
 }
 
 const rooms = new Map<string, Room>();
@@ -42,15 +42,46 @@ function ensureRoleCapacity(room: Room, role: Role, excludeId?: string): void {
   }
 }
 
+function hashPassword(password: string): string {
+  const salt = randomBytes(16);
+  const derivedKey = scryptSync(password, salt, 64);
+  return `${salt.toString('hex')}:${derivedKey.toString('hex')}`;
+}
+
+function passwordsMatch(password: string, storedHash: string): boolean {
+  const [saltHex, hashHex] = storedHash.split(':');
+  if (!saltHex || !hashHex) return false;
+  try {
+    const salt = Buffer.from(saltHex, 'hex');
+    const expected = Buffer.from(hashHex, 'hex');
+    const actual = scryptSync(password, salt, expected.length);
+    return timingSafeEqual(expected, actual);
+  } catch {
+    return false;
+  }
+}
+
 const storedRooms = await loadRooms();
+let migratedLegacyPasswords = false;
 for (const room of Object.values(storedRooms)) {
+  let passwordHash = room.passwordHash;
+  if (!passwordHash && room.password) {
+    passwordHash = hashPassword(room.password);
+    room.passwordHash = passwordHash;
+    delete room.password;
+    migratedLegacyPasswords = true;
+  }
   rooms.set(room.id, {
     id: room.id,
-    password: room.password,
+    passwordHash,
     participants: new Map<string, Participant>(
       room.participants.map(p => [p.id, { id: p.id, role: p.role as Role, lastActive: Date.now() }])
     ),
   });
+}
+
+if (migratedLegacyPasswords) {
+  persist();
 }
 
 function persist() {
@@ -58,7 +89,7 @@ function persist() {
   rooms.forEach((room, id) => {
     data[id] = {
       id,
-      password: room.password,
+      passwordHash: room.passwordHash,
       participants: Array.from(room.participants.values()).map(p => ({ id: p.id, role: p.role })),
     };
   });
@@ -117,15 +148,20 @@ export function setRole(roomId: string, participantId: string, role: Role): void
 export function setPassword(roomId: string, password?: string): void {
   const room = rooms.get(roomId);
   if (room) {
-    room.password = password;
+    if (password === undefined) {
+      delete room.passwordHash;
+    } else {
+      room.passwordHash = hashPassword(password);
+    }
     persist();
   }
 }
 
 export function verifyPassword(roomId: string, password?: string): boolean {
   const room = rooms.get(roomId);
-  if (!room?.password) return !password;
-  return room.password === password;
+  if (!room?.passwordHash) return !password;
+  const candidate = password ?? '';
+  return passwordsMatch(candidate, room.passwordHash);
 }
 
 export function attachSocket(roomId: string, participantId: string, ws?: WebSocket): void {

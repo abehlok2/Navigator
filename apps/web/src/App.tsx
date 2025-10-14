@@ -12,6 +12,11 @@ import AuthForm from './features/auth/AuthForm';
 import { useAuthStore } from './state/auth';
 import { useSessionStore } from './state/session';
 import { Button } from './components/ui/button';
+import { Badge } from './components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
+import { Input } from './components/ui/input';
+import { Label } from './components/ui/label';
+import { Select } from './components/ui/select';
 import {
   createRoom,
   joinRoom,
@@ -34,6 +39,20 @@ const ROLE_OPTIONS: Role[] = ['facilitator', 'explorer', 'listener'];
 type ModerationNotice = { type: 'success' | 'error'; message: string };
 type PendingModeration = { id: string; type: 'role' | 'remove' };
 
+const ChevronDownIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    aria-hidden="true"
+    focusable="false"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.5}
+    {...props}
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 8.5 10 12.5 14 8.5" />
+  </svg>
+);
+
 export default function App() {
   const rootRef = useRef<HTMLDivElement>(null);
   useAudioContextUnlock(rootRef);
@@ -47,6 +66,7 @@ export default function App() {
   }));
   const [roomId, setRoomId] = useState('');
   const [targetId, setTargetId] = useState('');
+  const [joinPassword, setJoinPassword] = useState('');
   const [participantId, setParticipantId] = useState<string | null>(null);
   const [participants, setParticipants] = useState<ParticipantSummary[]>([]);
   const [connecting, setConnecting] = useState(false);
@@ -288,7 +308,7 @@ export default function App() {
       void leaveRoom(roomId, joinedParticipantId, token).catch(() => {});
     };
     try {
-      const join = await joinRoom(roomId, role, token);
+      const join = await joinRoom(roomId, role, token, joinPassword || undefined);
       const remoteList = join.participants;
       setParticipants(remoteList);
       const resolvedTarget = remoteList.find(p => p.id === selectedTarget.id);
@@ -335,6 +355,7 @@ export default function App() {
   }, [
     cleanupRemoteAudio,
     handleTrack,
+    joinPassword,
     participants,
     roomId,
     role,
@@ -354,175 +375,278 @@ export default function App() {
   }
 
   return (
-    <div ref={rootRef} className="container">
-      <div className="mb-4 flex justify-between">
-        <h1>Explorer Sessions</h1>
-        <div className="flex items-center gap-2">
-          {username} <Button onClick={logout}>Logout</Button>
-        </div>
-      </div>
-
-      <ConnectionStatus />
-      {!isListenerSession && (
-        <>
-          <AssetDropZone />
-          <AssetAvailability />
-        </>
-      )}
-      {isFacilitatorSession && <FacilitatorControls />}
-      {isExplorerSession && <RecordingControls />}
-      {isListenerSession && <ListenerPanel />}
-      {!isListenerSession && <TelemetryDisplay />}
-      <div className="mt-4 flex flex-col gap-3">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={roomId}
-            onChange={e => setRoomId(e.target.value)}
-            placeholder="Room ID"
-            className="flex-1 rounded border border-gray-300 p-2"
-          />
-          <Button
-            type="button"
-            onClick={handleCreateRoom}
-            disabled={creatingRoom || !canCreateRoom}
-            title={canCreateRoom ? undefined : 'Only facilitators can create rooms'}
-          >
-            {creatingRoom ? 'Creating…' : 'Create Room'}
-          </Button>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={targetId}
-            onChange={e => setTargetId(e.target.value)}
-            className="flex-1 min-w-[200px] rounded border border-gray-300 p-2"
-            disabled={availableTargets.length === 0}
-          >
-            <option value="">Select participant…</option>
-            {availableTargets.map(participant => (
-              <option key={participant.id} value={participant.id}>
-                {`${formatRole(participant.role)} — ${participant.id}`}
-              </option>
-            ))}
-          </select>
-          <Button
-            type="button"
-            onClick={loadParticipants}
-            disabled={loadingParticipants || !roomId}
-          >
-            {loadingParticipants ? 'Loading…' : 'Refresh Participants'}
-          </Button>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" onClick={handleConnect} disabled={connecting || !targetId}>
-            {connecting ? 'Connecting…' : 'Connect'}
-          </Button>
-          {participantId && <span>Participant ID: {participantId}</span>}
-        </div>
-        {(participants.length > 0 || canModerateParticipants) && (
-          <div className="rounded border border-gray-200 p-3 text-xs text-gray-600 sm:text-sm">
-            <div className="text-sm font-medium text-gray-800">Participants</div>
-            {canModerateParticipants && (
-              <div className="mt-3 space-y-2">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <input
-                    type="password"
-                    value={roomPassword}
-                    onChange={e => setRoomPasswordInput(e.target.value)}
-                    placeholder="Set room password"
-                    className="flex-1 rounded border border-gray-300 p-2"
-                    disabled={settingPassword}
+    <div ref={rootRef} className="relative min-h-screen overflow-hidden bg-slate-100 text-slate-900">
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.18),transparent_65%)]" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[280px] bg-gradient-to-t from-white to-transparent" />
+      <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-10 px-4 pb-16 pt-10 lg:px-12">
+        <header className="rounded-3xl border border-slate-200/80 bg-white/80 p-8 shadow-xl shadow-sky-100/60 backdrop-blur">
+          <div className="flex flex-col gap-8">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-3 text-slate-500">
+                  <Badge variant="info" className="tracking-[0.3em] text-[10px]">Explorer Ops</Badge>
+                  <span className="text-xs font-medium uppercase tracking-[0.35em] text-slate-400">Navigator Control Surface</span>
+                </div>
+                <div className="space-y-3">
+                  <h1 className="text-3xl font-semibold tracking-tight lg:text-4xl">Explorer Sessions</h1>
+                  <p className="max-w-2xl text-base leading-relaxed text-slate-600">
+                    Coordinate real-time exploration audio, manage manifests, and stay ahead of connection issues.
+                  </p>
+                </div>
+              </div>
+              <div className="flex w-full flex-col gap-4 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm sm:w-auto sm:min-w-[240px]">
+                <div className="flex items-center justify-between gap-3 text-sm text-slate-500">
+                  <span className="font-medium text-slate-900">{username}</span>
+                  {role && isRole(role) && <Badge variant="muted">{formatRole(role)}</Badge>}
+                </div>
+                <Button
+                  onClick={logout}
+                  className="h-10 w-full bg-slate-900 text-sm font-medium text-white hover:bg-slate-800"
+                >
+                  Logout
+                </Button>
+              </div>
+            </div>
+            <ConnectionStatus />
+          </div>
+        </header>
+        <main className="grid flex-1 gap-8 xl:grid-cols-[1.75fr_1fr]">
+          <section className="space-y-8">
+            {!isListenerSession && (
+              <Card className="shadow-lg shadow-slate-200/60">
+                <CardHeader className="border-none pb-0">
+                  <CardTitle>Asset preparation</CardTitle>
+                  <CardDescription>
+                    Drop facilitator audio files and confirm that the explorer has every asset required for the session.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6 pt-0">
+                  <AssetDropZone />
+                  <AssetAvailability />
+                </CardContent>
+              </Card>
+            )}
+            {isFacilitatorSession && <FacilitatorControls />}
+            {isExplorerSession && <RecordingControls />}
+            {isListenerSession && <ListenerPanel />}
+            {!isListenerSession && <TelemetryDisplay />}
+          </section>
+          <section className="space-y-8">
+            <Card className="sticky top-8 shadow-lg shadow-slate-200/60">
+              <CardHeader className="border-none pb-0">
+                <CardTitle>Room access</CardTitle>
+                <CardDescription>
+                  Create rooms, join with a password, and connect to the right participant before streaming audio.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6 pt-0">
+                <div className="space-y-2">
+                  <Label htmlFor="room-id">Room ID</Label>
+                  <Input
+                    id="room-id"
+                    type="text"
+                    value={roomId}
+                    onChange={e => setRoomId(e.target.value)}
+                    placeholder="Enter or paste a room identifier"
                   />
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                    <Button
+                      type="button"
+                      onClick={handleCreateRoom}
+                      disabled={creatingRoom || !canCreateRoom}
+                      title={canCreateRoom ? undefined : 'Only facilitators can create rooms'}
+                      className="h-10 bg-sky-600 px-4 text-sm font-semibold text-white hover:bg-sky-700 disabled:bg-sky-400/60"
+                    >
+                      {creatingRoom ? 'Creating…' : 'Create Room'}
+                    </Button>
+                    {!canCreateRoom && <span>Only facilitators can create new rooms.</span>}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="join-password">Join password</Label>
+                  <Input
+                    id="join-password"
+                    type="password"
+                    value={joinPassword}
+                    onChange={e => setJoinPassword(e.target.value)}
+                    placeholder="Optional room password"
+                    autoComplete="current-password"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="target-id">Connect to</Label>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <div className="relative w-full">
+                      <Select
+                        id="target-id"
+                        value={targetId}
+                        onChange={e => setTargetId(e.target.value)}
+                        disabled={availableTargets.length === 0}
+                      >
+                        <option value="">Select participant…</option>
+                        {availableTargets.map(participant => (
+                          <option key={participant.id} value={participant.id}>
+                            {`${formatRole(participant.role)} — ${participant.id}`}
+                          </option>
+                        ))}
+                      </Select>
+                      <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={loadParticipants}
+                      disabled={loadingParticipants || !roomId}
+                      className="h-10 bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:bg-slate-400/70"
+                    >
+                      {loadingParticipants ? 'Loading…' : 'Refresh'}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Participants appear once they have joined the room. Facilitators can connect to any explorer or listener.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
                   <Button
                     type="button"
-                    onClick={handleSetRoomPassword}
-                    disabled={settingPassword || !roomId}
-                    className="px-3 py-2"
+                    onClick={handleConnect}
+                    disabled={connecting || !targetId}
+                    className="h-11 w-full justify-center bg-emerald-500 text-sm font-semibold text-white hover:bg-emerald-600 disabled:bg-emerald-300/70"
                   >
-                    {settingPassword ? 'Saving…' : 'Save Password'}
+                    {connecting ? 'Connecting…' : 'Connect'}
                   </Button>
+                  <div className="flex flex-col gap-2 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+                    <span>
+                      {participantId ? `Participant ID: ${participantId}` : 'No active participant connection yet.'}
+                    </span>
+                    {error && <span className="font-medium text-rose-600">{error}</span>}
+                  </div>
                 </div>
-                <div className="text-[11px] text-gray-500">Leave blank to clear the room password.</div>
-              </div>
-            )}
-            {canModerateParticipants && moderationNotice && (
-              <div
-                className={`mt-2 text-sm ${
-                  moderationNotice.type === 'error' ? 'text-red-600' : 'text-green-600'
-                }`}
-              >
-                {moderationNotice.message}
-              </div>
-            )}
-            {participants.length > 0 ? (
-              <ul className="mt-3 space-y-2">
-                {participants.map(participant => {
-                  const isSelfParticipant = participantId === participant.id;
-                  const isPending = pendingModeration?.id === participant.id;
-                  const isRemoving = isPending && pendingModeration?.type === 'remove';
-                  const isUpdatingRole = isPending && pendingModeration?.type === 'role';
-                  return (
-                    <li key={participant.id} className="rounded border border-gray-100 p-2">
-                      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-medium capitalize">{participant.role}</span>
-                          <span className="font-mono text-[11px] text-gray-500">{participant.id}</span>
-                          {isSelfParticipant && (
-                            <span className="text-[10px] font-semibold uppercase text-blue-600">You</span>
-                          )}
-                        </div>
-                        <span className={participant.connected ? 'text-green-600' : 'text-gray-500'}>
-                          {participant.connected ? 'connected' : 'offline'}
-                        </span>
-                      </div>
-                      {canModerateParticipants && (
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <label className="flex items-center gap-2 text-xs text-gray-600 sm:text-sm">
-                            <span>Role</span>
-                            <select
-                              value={participant.role}
-                              onChange={e => {
-                                const nextRole = e.target.value as Role;
-                                if (nextRole !== participant.role && !isSelfParticipant) {
-                                  handleParticipantRoleChange(participant.id, nextRole);
-                                }
-                              }}
-                              className="rounded border border-gray-300 p-1 text-xs sm:text-sm"
-                              disabled={isPending || isSelfParticipant}
-                            >
-                              {ROLE_OPTIONS.map(option => (
-                                <option key={option} value={option}>
-                                  {formatRole(option)}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <button
+              </CardContent>
+            </Card>
+            {(participants.length > 0 || canModerateParticipants) && (
+              <Card className="space-y-0 shadow-lg shadow-slate-200/60">
+                <CardHeader className="border-none pb-0">
+                  <CardTitle>Participants</CardTitle>
+                  <CardDescription>Review the room roster and update roles or access in real time.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6 pt-0">
+                  {canModerateParticipants && (
+                    <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="room-password" className="text-sm font-semibold text-slate-600">
+                          Room password
+                        </Label>
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                          <Input
+                            id="room-password"
+                            type="text"
+                            value={roomPassword}
+                            onChange={e => setRoomPasswordInput(e.target.value)}
+                            placeholder="Set or clear the room password"
+                            disabled={settingPassword}
+                          />
+                          <Button
                             type="button"
-                            onClick={() => handleRemoveParticipant(participant.id)}
-                            className="rounded border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
-                            disabled={isPending || isSelfParticipant}
+                            onClick={handleSetRoomPassword}
+                            disabled={settingPassword || !roomId}
+                            className="h-10 bg-sky-600 px-4 text-sm font-semibold text-white hover:bg-sky-700 disabled:bg-sky-400/60"
                           >
-                            {isRemoving ? 'Removing…' : 'Remove'}
-                          </button>
-                          {isUpdatingRole && (
-                            <span className="text-[11px] text-gray-500">Updating role…</span>
-                          )}
-                          {isSelfParticipant && (
-                            <span className="text-[11px] text-gray-500">You cannot modify your own entry.</span>
-                          )}
+                            {settingPassword ? 'Saving…' : 'Save'}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-slate-500">Leave the field blank and save to remove the password.</p>
+                      </div>
+                      {moderationNotice && (
+                        <div
+                          className={
+                            moderationNotice.type === 'error'
+                              ? 'rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700'
+                              : 'rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700'
+                          }
+                        >
+                          {moderationNotice.message}
                         </div>
                       )}
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <div className="mt-3 text-xs text-gray-500">No participants in this room yet.</div>
+                    </div>
+                  )}
+                  {participants.length > 0 ? (
+                    <ul className="space-y-4">
+                      {participants.map(participant => {
+                        const isSelfParticipant = participantId === participant.id;
+                        const isPending = pendingModeration?.id === participant.id;
+                        const isRemoving = isPending && pendingModeration?.type === 'remove';
+                        const isUpdatingRole = isPending && pendingModeration?.type === 'role';
+                        const selectId = `participant-${participant.id}-role`;
+                        return (
+                          <li
+                            key={participant.id}
+                            className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm"
+                          >
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
+                                <Badge variant="info">{formatRole(participant.role)}</Badge>
+                                <span className="font-mono text-xs text-slate-500">{participant.id}</span>
+                                {isSelfParticipant && <Badge variant="muted">You</Badge>}
+                              </div>
+                              <Badge variant={participant.connected ? 'success' : 'muted'}>
+                                {participant.connected ? 'Connected' : 'Offline'}
+                              </Badge>
+                            </div>
+                            {canModerateParticipants && (
+                              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                                  <Label htmlFor={selectId}>Role</Label>
+                                  <div className="relative w-full sm:w-[200px]">
+                                    <Select
+                                      id={selectId}
+                                      value={participant.role}
+                                      onChange={e => {
+                                        const nextRole = e.target.value as Role;
+                                        if (nextRole !== participant.role && !isSelfParticipant) {
+                                          handleParticipantRoleChange(participant.id, nextRole);
+                                        }
+                                      }}
+                                      disabled={isPending || isSelfParticipant}
+                                    >
+                                      {ROLE_OPTIONS.map(option => (
+                                        <option key={option} value={option}>
+                                          {formatRole(option)}
+                                        </option>
+                                      ))}
+                                    </Select>
+                                    <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                  </div>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-3">
+                                  <Button
+                                    type="button"
+                                    onClick={() => handleRemoveParticipant(participant.id)}
+                                    disabled={isPending || isSelfParticipant}
+                                    className="h-9 bg-rose-500 px-3 text-xs font-semibold text-white hover:bg-rose-600 disabled:bg-rose-300/70"
+                                  >
+                                    {isRemoving ? 'Removing…' : 'Remove'}
+                                  </Button>
+                                  {isUpdatingRole && <span className="text-xs text-slate-500">Updating role…</span>}
+                                  {isSelfParticipant && (
+                                    <span className="text-xs text-slate-500">You cannot modify your own entry.</span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-6 text-sm text-slate-500">
+                      No participants in this room yet.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             )}
-          </div>
-        )}
-        {error && <div className="text-sm text-red-600">{error}</div>}
+          </section>
+        </main>
       </div>
     </div>
   );

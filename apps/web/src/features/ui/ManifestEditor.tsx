@@ -1,9 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { getAudioContext } from '../audio/context';
+import { registerRawAsset } from '../audio/assets';
 import { useSessionStore } from '../../state/session';
 import type { AssetManifest } from '../control/protocol';
-
-type SourceType = 'file' | 'url';
 
 function generateKey() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -12,18 +11,20 @@ function generateKey() {
   return Math.random().toString(36).slice(2);
 }
 
+type EntryKind = 'file' | 'manual';
+
 interface ManifestDraftEntry {
   key: string;
   id: string;
   title: string;
   notes: string;
-  sourceType: SourceType;
-  url?: string;
+  kind: EntryKind;
   fileName?: string;
   mimeType?: string;
   sha256?: string;
   bytes?: number;
   duration?: number;
+  legacyUrl?: string;
 }
 
 const AUDIO_EXTENSIONS = ['.mp3', '.wav', '.flac', '.ogg', '.m4a', '.aac', '.aiff'];
@@ -72,10 +73,11 @@ function createDraftFromManifest(entries: AssetManifest['entries']): ManifestDra
     id: entry.id,
     title: typeof entry.title === 'string' ? entry.title : entry.id,
     notes: typeof entry.notes === 'string' ? entry.notes : '',
-    sourceType: 'url',
-    url: entry.url,
+    kind: 'manual',
     sha256: entry.sha256,
     bytes: entry.bytes,
+    duration: undefined,
+    legacyUrl: entry.url,
   }));
 }
 
@@ -137,12 +139,14 @@ export default function ManifestEditor() {
           digestSha256(arrayBuffer),
           estimateDuration(arrayBuffer),
         ]);
+        registerRawAsset(sha256, arrayBuffer, file.type || undefined);
+
         const entry: ManifestDraftEntry = {
           key: generateKey(),
           id: file.name,
           title: file.name,
           notes: '',
-          sourceType: 'file',
+          kind: 'file',
           fileName: file.name,
           mimeType: file.type || undefined,
           sha256,
@@ -162,24 +166,6 @@ export default function ManifestEditor() {
       setErrors([]);
     }
     event.target.value = '';
-  };
-
-  const handleAddUrl = () => {
-    const entry: ManifestDraftEntry = {
-      key: generateKey(),
-      id: '',
-      title: '',
-      notes: '',
-      sourceType: 'url',
-      url: '',
-      sha256: '',
-      bytes: undefined,
-      duration: undefined,
-    };
-    setErrors([]);
-    setSendError(null);
-    setSendSuccess(null);
-    setDraftEntries(current => [...current, entry]);
   };
 
   const updateEntry = (key: string, update: Partial<ManifestDraftEntry>) => {
@@ -248,14 +234,6 @@ export default function ManifestEditor() {
       if (typeof entry.bytes !== 'number' || entry.bytes <= 0) {
         problems.push(`${label}: File size (bytes) must be provided.`);
       }
-      if (entry.sourceType === 'url') {
-        const hasUrl = !!entry.url && entry.url.trim().length > 0;
-        const hasNotes = entry.notes.trim().length > 0;
-        if (!hasUrl && !hasNotes) {
-          problems.push(`${label}: Provide a source URL or notes about where to retrieve the asset.`);
-        }
-      }
-
       if (typeof entry.duration === 'number' && entry.duration <= 0) {
         problems.push(`${label}: Duration must be a positive number if provided.`);
       }
@@ -263,14 +241,12 @@ export default function ManifestEditor() {
       if (trimmedId && entry.sha256 && shaPattern.test(entry.sha256) && typeof entry.bytes === 'number' && entry.bytes > 0) {
         const normalizedTitle = entry.title.trim();
         const normalizedNotes = entry.notes.trim();
-        const normalizedUrl = entry.url?.trim() ?? '';
         entries.push({
           id: trimmedId,
           sha256: entry.sha256.toLowerCase(),
           bytes: entry.bytes,
           ...(normalizedTitle ? { title: normalizedTitle } : {}),
           ...(normalizedNotes ? { notes: normalizedNotes } : {}),
-          ...(normalizedUrl ? { url: normalizedUrl } : {}),
         });
       }
     });
@@ -304,9 +280,6 @@ export default function ManifestEditor() {
         <div className="flex gap-2">
           <button type="button" onClick={handleAddFiles} className="rounded border border-gray-300 px-2 py-1">
             Add Files
-          </button>
-          <button type="button" onClick={handleAddUrl} className="rounded border border-gray-300 px-2 py-1">
-            Add URL
           </button>
           <button type="button" onClick={handleResetToSession} className="rounded border border-gray-300 px-2 py-1">
             Load Current
@@ -371,22 +344,23 @@ export default function ManifestEditor() {
                 </label>
               </div>
               <div className="mt-3 grid gap-2 md:grid-cols-2">
-                {entry.sourceType === 'file' ? (
+                {entry.kind === 'file' ? (
                   <div className="text-sm text-gray-700">
                     <div><span className="font-medium">File:</span> {entry.fileName}</div>
                     <div><span className="font-medium">Type:</span> {entry.mimeType || 'unknown'}</div>
                   </div>
                 ) : (
-                  <label className="flex flex-col text-sm md:col-span-2">
-                    <span className="mb-1 font-medium">Source URL</span>
-                    <input
-                      type="url"
-                      value={entry.url || ''}
-                      placeholder="https://example.com/path/to/audio.mp3"
-                      onChange={e => updateEntry(entry.key, { url: e.target.value })}
-                      className="rounded border border-gray-300 p-2"
-                    />
-                  </label>
+                  <div className="text-sm text-gray-700 md:col-span-2">
+                    <div className="rounded border border-yellow-200 bg-yellow-50 p-2 text-xs text-yellow-800">
+                      Attach facilitator-provided local audio files using the Add Files button. Remote URLs are no longer
+                      supported.
+                    </div>
+                    {entry.legacyUrl && (
+                      <div className="mt-2 break-all text-xs text-gray-600">
+                        Legacy reference: {entry.legacyUrl}
+                      </div>
+                    )}
+                  </div>
                 )}
                 <label className="flex flex-col text-sm">
                   <span className="mb-1 font-medium">SHA-256</span>
@@ -395,7 +369,7 @@ export default function ManifestEditor() {
                     value={entry.sha256 || ''}
                     onChange={e => updateEntry(entry.key, { sha256: e.target.value.trim().toLowerCase() })}
                     className="rounded border border-gray-300 p-2"
-                    readOnly={entry.sourceType === 'file'}
+                    readOnly={entry.kind === 'file'}
                   />
                 </label>
                 <label className="flex flex-col text-sm">
@@ -405,10 +379,10 @@ export default function ManifestEditor() {
                     value={entry.bytes ?? ''}
                     onChange={e => updateEntry(entry.key, { bytes: e.target.value ? Number(e.target.value) : undefined })}
                     className="rounded border border-gray-300 p-2"
-                    readOnly={entry.sourceType === 'file'}
+                    readOnly={entry.kind === 'file'}
                   />
                 </label>
-                {entry.sourceType === 'url' ? (
+                {entry.kind === 'manual' ? (
                   <label className="flex flex-col text-sm">
                     <span className="mb-1 font-medium">Estimated Duration (seconds)</span>
                     <input
@@ -436,7 +410,7 @@ export default function ManifestEditor() {
           ))}
         </ul>
       ) : (
-        <div className="mt-4 text-sm text-gray-600">No manifest entries yet. Add files or URLs to begin.</div>
+        <div className="mt-4 text-sm text-gray-600">No manifest entries yet. Add files to begin.</div>
       )}
       {errors.length > 0 && (
         <div className="mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">

@@ -11,10 +11,17 @@ import {
   invalidate as invalidatePlayer,
   getPlayer,
 } from '../audio/scheduler';
-import { getMasterGain } from '../audio/context';
+import { getAudioContext, getMasterGain } from '../audio/context';
 import { cleanupSpeechDucking, setupSpeechDucking } from '../audio/ducking';
 import { hasSpeechInput, setLocalSpeechFallback } from '../audio/speech';
-import { loadRemoteAsset, hasBuffer, removeBuffer } from '../audio/assets';
+import {
+  hasBuffer,
+  removeBuffer,
+  setBuffer,
+  registerRawAsset,
+  getRawAssetBySha,
+  digestSha256,
+} from '../audio/assets';
 import {
   wireMessageSchema,
   payloadSchemaByType,
@@ -53,6 +60,7 @@ export class ControlChannel {
   private pending = new Map<string, Pending>();
   private duckingConfig: CmdDucking | null = null;
   private lastManifest: AssetManifest['entries'] | null = null;
+  private lastFetchedContentType: string | null = null;
 
   constructor(dc: RTCDataChannel, opts: ControlChannelOptions) {
     this.dc = dc;
@@ -237,6 +245,30 @@ export class ControlChannel {
     }
   }
 
+  private async fetchAssetSource(
+    source: string,
+    totalBytes: number,
+    state: ReturnType<typeof useSessionStore.getState>,
+    id: string,
+    expectedBytes?: number,
+  ): Promise<ArrayBuffer> {
+    this.lastFetchedContentType = null;
+    const response = await fetch(source);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch asset (${response.status})`);
+    }
+    this.lastFetchedContentType = response.headers.get('content-type');
+    const array = await response.arrayBuffer();
+    const declaredTotal = expectedBytes && expectedBytes > 0 ? expectedBytes : totalBytes;
+    const finalTotal = declaredTotal > 0 ? declaredTotal : array.byteLength || 1;
+    const loaded = Math.min(array.byteLength, finalTotal);
+    state.setAssetProgress(id, loaded, finalTotal);
+    if (expectedBytes && expectedBytes > 0 && array.byteLength !== expectedBytes) {
+      throw new Error('Fetched asset size mismatch; verify facilitator-provided media.');
+    }
+    return array;
+  }
+
   private sendAck(txn: string | undefined, ok: boolean, error?: string) {
     if (!txn) return;
     const ackMsg: WireMessage = {
@@ -340,45 +372,81 @@ export class ControlChannel {
       : undefined;
     const hadAsset = state.assets.has(cmd.id);
     const baseTotal = cmd.bytes ?? state.manifest[cmd.id]?.bytes ?? previousProgress?.total ?? 0;
-    const optimisticLoaded = baseTotal > 0 ? Math.min(baseTotal, Math.max(1, baseTotal * 0.01)) : 1;
-    const optimisticTotal = baseTotal > 0 ? baseTotal : 1;
-    state.setAssetProgress(cmd.id, optimisticLoaded, optimisticTotal);
+    const initialTotal = baseTotal > 0 ? baseTotal : 1;
+    const optimisticLoaded = Math.min(initialTotal, Math.max(1, initialTotal * 0.01));
+    state.setAssetProgress(cmd.id, optimisticLoaded, initialTotal);
 
-    if (!cmd.source) {
-      if (hasBuffer(cmd.id) || hadAsset) {
-        const previousTotal = previousProgress?.total ?? baseTotal;
-        const normalisedTotal = previousTotal > 0 ? previousTotal : 1;
-        state.setAssetProgress(cmd.id, previousProgress?.loaded ?? baseTotal, normalisedTotal);
-        this.sendAck(txn, true);
-        return;
-      }
-      const error = 'no source provided for load command';
-      state.setAssetProgress(cmd.id, 0, optimisticTotal);
-      this.sendAck(txn, false, error);
-      this.opts.onError?.(error);
-      return;
-    }
+    const manifestEntry = state.manifest[cmd.id];
+    const total = manifestEntry?.bytes ?? baseTotal;
+    const normalisedTotal = total > 0 ? total : initialTotal;
+    const expectedSha = (cmd.sha256 ?? manifestEntry?.sha256)?.toLowerCase();
 
-    try {
-      const result = await loadRemoteAsset({ id: cmd.id, source: cmd.source, sha256: cmd.sha256 });
-      const rawTotal = cmd.bytes ?? result.bytes ?? baseTotal;
-      const finalTotal = rawTotal > 0 ? rawTotal : 1;
-      state.setAssetProgress(cmd.id, finalTotal, finalTotal);
+    if (hasBuffer(cmd.id) || hadAsset) {
+      state.setAssetProgress(cmd.id, normalisedTotal, normalisedTotal);
       invalidatePlayer(cmd.id);
       state.addAsset(cmd.id, { broadcast: true });
       this.sendAck(txn, true);
-    } catch (err) {
-      if (previousProgress) {
-        state.setAssetProgress(cmd.id, previousProgress.loaded, previousProgress.total);
-      } else {
-        state.setAssetProgress(cmd.id, 0, optimisticTotal);
-        state.removeAsset(cmd.id, { broadcast: false });
-        removeBuffer(cmd.id);
-      }
-      const message = (err as Error).message ?? 'failed to load asset';
-      this.sendAck(txn, false, message);
-      this.opts.onError?.(message);
+      return;
     }
+
+    const ctx = getAudioContext();
+    const useRaw = expectedSha ? getRawAssetBySha(expectedSha) : undefined;
+
+    if (useRaw || cmd.source) {
+      try {
+        const arrayBuffer = useRaw
+          ? useRaw.data.slice(0)
+          : await this.fetchAssetSource(
+              cmd.source!,
+              normalisedTotal,
+              state,
+              cmd.id,
+              cmd.bytes ?? manifestEntry?.bytes ?? undefined,
+            );
+
+        const actualSha = await digestSha256(arrayBuffer);
+        if (expectedSha && actualSha !== expectedSha) {
+          throw new Error('Asset hash mismatch; expected facilitator-provided file.');
+        }
+
+        if (!useRaw) {
+          const contentType = this.lastFetchedContentType;
+          registerRawAsset(expectedSha ?? actualSha, arrayBuffer, contentType ?? undefined);
+        }
+
+        const buffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
+        setBuffer(cmd.id, buffer);
+        state.setAssetProgress(cmd.id, normalisedTotal, normalisedTotal);
+        invalidatePlayer(cmd.id);
+        state.addAsset(cmd.id, { broadcast: true });
+        this.sendAck(txn, true);
+        return;
+      } catch (err) {
+        const message = (err as Error).message || 'Failed to load asset from facilitator source.';
+        if (previousProgress) {
+          state.setAssetProgress(cmd.id, previousProgress.loaded, previousProgress.total);
+        } else {
+          state.setAssetProgress(cmd.id, 0, normalisedTotal);
+          state.removeAsset(cmd.id, { broadcast: false });
+          removeBuffer(cmd.id);
+        }
+        this.sendAck(txn, false, message);
+        this.opts.onError?.(message);
+        return;
+      }
+    }
+
+    const message =
+      'Asset is not available locally. Provide facilitator-supplied files before issuing load commands.';
+    if (previousProgress) {
+      state.setAssetProgress(cmd.id, previousProgress.loaded, previousProgress.total);
+    } else {
+      state.setAssetProgress(cmd.id, 0, normalisedTotal);
+      state.removeAsset(cmd.id, { broadcast: false });
+      removeBuffer(cmd.id);
+    }
+    this.sendAck(txn, false, message);
+    this.opts.onError?.(message);
   }
 
   private handleUnloadCommand(txn: string | undefined, cmd: CmdUnload) {
