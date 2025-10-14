@@ -286,8 +286,19 @@ export class ControlChannel {
   }
 
   setManifest(entries: AssetManifest['entries']) {
-    this.lastManifest = entries.map(entry => ({ ...entry }));
-    return this.send('asset.manifest', { entries });
+    const normalized = entries.map(entry => {
+      const next: AssetManifest['entries'][number] = {
+        id: entry.id,
+        sha256: entry.sha256,
+        bytes: entry.bytes,
+      };
+      if (typeof entry.title === 'string') next.title = entry.title;
+      if (typeof entry.notes === 'string') next.notes = entry.notes;
+      if (typeof entry.url === 'string') next.url = entry.url;
+      return next;
+    });
+    this.lastManifest = normalized;
+    return this.send('asset.manifest', { entries: normalized });
   }
 
   play(cmd: CmdPlay) {

@@ -103,17 +103,31 @@ describe('UI components', () => {
     resetSessionStore(useSessionStore);
     useSessionStore.setState({
       manifest: {
-        tone: { id: 'tone', sha256: 'hash1', bytes: 1024 },
-        chime: { id: 'chime', sha256: 'hash2', bytes: 2048 },
+        tone: {
+          id: 'tone',
+          sha256: 'hash1',
+          bytes: 1024,
+          title: 'Tone Pad',
+          notes: 'Primary intro bed',
+          url: 'https://assets.example.com/tone.wav',
+        },
+        chime: { id: 'chime', sha256: 'hash2', bytes: 2048, title: 'Segment Chime' },
       },
       assets: new Set(['tone']),
     });
 
     render(<AssetDropZone />);
 
-    const instructions = screen.getByText('Drop audio files matching: tone, chime');
+    const instructions = screen.getByText('Drop audio files to match your manifest.');
     expect(instructions).toBeTruthy();
     expect(screen.getByText(/Loaded 1 \/ 2/)).toBeTruthy();
+    expect(screen.getByText('Tone Pad')).toBeTruthy();
+    expect(screen.getByText('ID: tone')).toBeTruthy();
+    expect(screen.getByText('Primary intro bed')).toBeTruthy();
+    const sourceLink = screen.getByRole('link', { name: 'Source' });
+    expect(sourceLink.getAttribute('href')).toBe('https://assets.example.com/tone.wav');
+    expect(screen.getByText('Segment Chime')).toBeTruthy();
+    expect(screen.getByText('ID: chime')).toBeTruthy();
 
     const dropZone = instructions.parentElement as HTMLElement;
     fireEvent.drop(dropZone, { nativeEvent: { dataTransfer: {} } });
