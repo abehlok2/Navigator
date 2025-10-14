@@ -8,7 +8,6 @@ import { Select } from '../../components/ui/select';
 import { apiUrl } from '../../config';
 
 const USERNAME_PATTERN = /^[a-zA-Z0-9_-]{3,32}$/;
-const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9]).{8,128}$/;
 
 function decodeJwtPayload(token: string): { username?: string; role?: string } | null {
   try {
@@ -38,8 +37,8 @@ export default function AuthForm() {
     if (!USERNAME_PATTERN.test(trimmedUsername)) {
       return 'Usernames must be 3-32 characters and can include letters, numbers, underscores, or hyphens.';
     }
-    if (!PASSWORD_PATTERN.test(password)) {
-      return 'Passwords must be 8-128 characters and include at least one uppercase letter, one lowercase letter, and one number.';
+    if (password.length < 8 || password.length > 128) {
+      return 'Passwords must be between 8 and 128 characters.';
     }
     if (mode === 'register' && password !== confirmPassword) {
       return 'Passwords do not match.';
@@ -122,107 +121,70 @@ export default function AuthForm() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 px-4 py-10 text-slate-100">
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.18),transparent_65%)]" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[320px] bg-gradient-to-t from-slate-900 to-transparent" />
-
-      <Card className="relative w-full max-w-md border-slate-800/60 bg-white/95 text-slate-900 shadow-2xl shadow-sky-900/40">
-        <CardHeader className="border-none pb-0">
-          <CardTitle className="text-2xl font-semibold">
-            {mode === 'login' ? 'Welcome back' : 'Create an account'}
-          </CardTitle>
-          <CardDescription className="text-sm text-slate-600">
-            {mode === 'login'
-              ? 'Sign in to coordinate your next exploration session.'
-              : 'Register to access explorer, facilitator, or listener controls.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="username" className="text-sm font-medium text-slate-600">
-                Username
-              </Label>
-              <Input
-                id="username"
-                type="text"
-                placeholder="Your username"
-                value={username}
-                onChange={e => setUsername(e.target.value)}
-                autoComplete="username"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium text-slate-600">
-                Password
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Enter password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              />
-            </div>
-
-            {mode === 'register' && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-password" className="text-sm font-medium text-slate-600">
-                    Confirm password
-                  </Label>
-                  <Input
-                    id="confirm-password"
-                    type="password"
-                    placeholder="Re-enter password"
-                    value={confirmPassword}
-                    onChange={e => setConfirmPassword(e.target.value)}
-                    autoComplete="new-password"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="role" className="text-sm font-medium text-slate-600">
-                    Session role
-                  </Label>
-                  <Select
-                    id="role"
-                    value={role}
-                    onChange={e => setRole(e.target.value as 'explorer' | 'facilitator' | 'listener')}
-                  >
-                    <option value="explorer">Explorer</option>
-                    <option value="facilitator">Facilitator</option>
-                    <option value="listener">Listener</option>
-                  </Select>
-                </div>
-              </>
-            )}
-
-            <p className="text-sm text-slate-500">
-              Passwords must include upper- and lower-case letters and at least one number.
-            </p>
-            {error && <div className="whitespace-pre-wrap text-sm font-medium text-rose-600">{error}</div>}
-
-            <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? (mode === 'login' ? 'Logging in…' : 'Registering…') : mode === 'login' ? 'Login' : 'Register'}
-            </Button>
-          </form>
-
-          <Button
-            type="button"
-            onClick={() => {
-              setMode(mode === 'login' ? 'register' : 'login');
-              setError(null);
-              setConfirmPassword('');
-            }}
-            className="w-full bg-transparent text-slate-700 transition hover:bg-slate-100"
-          >
-            {mode === 'login' ? 'Need an account? Register' : 'Have an account? Login'}
+    <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-8">
+      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-lg">
+        <h2 className="mb-6 text-center text-2xl font-semibold">
+          {mode === 'login' ? 'Login' : 'Create Account'}
+        </h2>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <input
+            type="text"
+            placeholder="Username"
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+            className="w-full rounded border border-gray-300 p-3"
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            className="w-full rounded border border-gray-300 p-3"
+          />
+          {mode === 'register' && (
+            <input
+              type="password"
+              placeholder="Confirm Password"
+              value={confirmPassword}
+              onChange={e => setConfirmPassword(e.target.value)}
+              className="w-full rounded border border-gray-300 p-3"
+            />
+          )}
+          {mode === 'register' && (
+            <select
+              value={role}
+              onChange={e => setRole(e.target.value as 'explorer' | 'facilitator' | 'listener')}
+              className="w-full rounded border border-gray-300 p-3"
+            >
+              <option value="explorer">Explorer</option>
+              <option value="facilitator">Facilitator</option>
+              <option value="listener">Listener</option>
+            </select>
+          )}
+          <p className="text-sm text-gray-500">Passwords must be between 8 and 128 characters.</p>
+          {error && <div className="whitespace-pre-wrap text-sm text-red-500">{error}</div>}
+          <Button type="submit" className="w-full" disabled={submitting}>
+            {submitting
+              ? mode === 'login'
+                ? 'Logging in…'
+                : 'Registering…'
+              : mode === 'login'
+                ? 'Login'
+                : 'Register'}
           </Button>
-        </CardContent>
-      </Card>
+        </form>
+        <Button
+          type="button"
+          onClick={() => {
+            setMode(mode === 'login' ? 'register' : 'login');
+            setError(null);
+            setConfirmPassword('');
+          }}
+          className="mt-4 w-full bg-transparent text-blue-600 hover:bg-blue-50"
+        >
+          {mode === 'login' ? 'Need an account? Register' : 'Have an account? Login'}
+        </Button>
+      </div>
     </div>
   );
 }
