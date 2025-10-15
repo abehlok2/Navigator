@@ -11,7 +11,7 @@ import {
   invalidate as invalidatePlayer,
   getPlayer,
 } from '../audio/scheduler';
-import { getAudioContext, getMasterGain } from '../audio/context';
+import { getAudioContext, getProgramBus } from '../audio/context';
 import { cleanupSpeechDucking, setupSpeechDucking } from '../audio/ducking';
 import { hasSpeechInput, setLocalSpeechFallback } from '../audio/speech';
 import {
@@ -88,7 +88,7 @@ export class ControlChannel {
     if (!hasSpeechInput()) {
       this.opts.onError?.('ducking enabled but no speech input available');
     }
-    setupSpeechDucking(getMasterGain(), {
+    setupSpeechDucking(getProgramBus(), {
       thresholdDb: cmd.thresholdDb,
       reducedDb: cmd.reduceDb,
       attack: cmd.attackMs / 1000,
