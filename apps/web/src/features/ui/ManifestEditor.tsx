@@ -65,6 +65,8 @@ type ManifestValidation = {
   entryErrors: Record<string, string[]>;
 };
 
+type ManifestEntry = AssetManifest['entries'][number];
+
 interface ManifestDiff {
   added: ManifestDraftEntry[];
   removed: AssetManifest['entries'];
@@ -163,7 +165,7 @@ function computeDiff(
 ): ManifestDiff {
   const baselineMap = new Map(baseline.map(entry => [entry.id, entry]));
   const baselineIndex = new Map(baseline.map((entry, index) => [entry.id, index]));
-  const draftManifest = drafts.map(toManifestEntry);
+  const draftManifest: ManifestEntry[] = drafts.map(toManifestEntry);
   const draftMap = new Map(draftManifest.map(entry => [entry.id, entry]));
   const diff: ManifestDiff = { added: [], removed: [], updated: [], reordered: [] };
 
