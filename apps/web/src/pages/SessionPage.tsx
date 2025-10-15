@@ -436,68 +436,6 @@ export default function SessionPage() {
     [cleanupRemoteAudio, roomId, targetId, token],
   );
 
-  const selectableParticipantIds = useMemo(
-    () => availableTargets.map(participant => participant.id),
-    [availableTargets]
-  );
-
-  const roleViewContent = useMemo(() => {
-    if (isFacilitatorSession) {
-      return (
-        <FacilitatorView
-          participants={participants}
-          currentParticipantId={participantId}
-          selectedParticipantId={targetId || null}
-          selectableParticipantIds={selectableParticipantIds}
-          onSelectParticipant={handleParticipantCardSelect}
-          canModerate={canModerateParticipants}
-          onChangeRole={handleParticipantRoleChange}
-          onRemoveParticipant={handleRemoveParticipant}
-          pendingModeration={pendingModeration}
-        />
-      );
-    }
-    if (isExplorerSession) {
-      return <ExplorerView />;
-    }
-    if (isListenerSession) {
-      return (
-        <ListenerView
-          participants={participants}
-          participantId={participantId}
-          facilitatorId={targetId || null}
-          username={username}
-        />
-      );
-    }
-    return (
-      <Card className="shadow-lg shadow-slate-200/60">
-        <CardHeader className="border-none pb-0">
-          <CardTitle>Waiting for session</CardTitle>
-          <CardDescription>Join a room to activate the appropriate session workspace.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 pt-0 text-sm text-slate-600">
-          <p>Use the controls on the right to join a room and select a target participant.</p>
-          <p>Once connected your session role will determine which workspace loads here automatically.</p>
-        </CardContent>
-      </Card>
-    );
-  }, [
-    canModerateParticipants,
-    handleParticipantCardSelect,
-    handleParticipantRoleChange,
-    handleRemoveParticipant,
-    isExplorerSession,
-    isFacilitatorSession,
-    isListenerSession,
-    participantId,
-    participants,
-    pendingModeration,
-    selectableParticipantIds,
-    targetId,
-    username,
-  ]);
-
   if (!token) {
     return <AuthForm />;
   }

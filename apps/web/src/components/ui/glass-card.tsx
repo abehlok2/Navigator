@@ -27,7 +27,7 @@ const glowColorStyles: Record<GlassCardGlowColor, string> = {
   green:
     'after:bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.3),transparent_60%)] group-hover:shadow-[0_52px_150px_-50px_rgba(16,185,129,0.78)]',
   cyan:
-    'after:bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.3),transparent_60%)] group-hover:shadow-[0_52px_150px_-50px_rgba(34,211,238,0.8)]',
+    'after:bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.32),transparent_60%)] group-hover:shadow-[0_52px_150px_-50px_rgba(8,145,178,0.8)]',
 };
 
 export const GlassCard = React.forwardRef<HTMLDivElement, GlassCardProps>(

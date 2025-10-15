@@ -313,6 +313,26 @@ export default function DashboardPage() {
   const [wizardStartNow, setWizardStartNow] = useState(true);
   const [wizardSaving, setWizardSaving] = useState(false);
   const [wizardError, setWizardError] = useState<string | null>(null);
+  const resetWizard = useCallback(() => {
+    setWizardName('');
+    setWizardTemplate('mission');
+    setWizardPassword('');
+    setWizardAutoRecord(true);
+    setWizardAllowObservers(false);
+    setWizardStartNow(true);
+    setWizardSaving(false);
+    setWizardError(null);
+  }, []);
+
+  const openRoomWizard = useCallback(() => {
+    resetWizard();
+    setCreateWizardOpen(true);
+  }, [resetWizard]);
+
+  useEffect(() => {
+    if (createWizardOpen) return;
+    resetWizard();
+  }, [createWizardOpen, resetWizard]);
 
   const [joinRoomId, setJoinRoomId] = useState('');
   const [joinPassword, setJoinPassword] = useState('');
@@ -627,10 +647,7 @@ export default function DashboardPage() {
                       glass
                       size="lg"
                       className="h-16 justify-between rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-500 text-left text-white shadow-[0_24px_60px_-30px_rgba(59,130,246,0.9)]"
-                      onClick={() => {
-                        setWizardError(null);
-                        setCreateWizardOpen(true);
-                      }}
+                      onClick={openRoomWizard}
                     >
                       <span className="flex flex-col text-left">
                         <span className="text-sm uppercase tracking-[0.35em] text-white/80">Create</span>
@@ -692,7 +709,7 @@ export default function DashboardPage() {
                       Track the rooms you’ve recently prepared. Continue where you left off or retire inactive sessions.
                     </GlassCardDescription>
                   </div>
-                  <Button type="button" variant="ghost" className="border border-white/15 bg-white/10 text-white hover:bg-white/20" onClick={() => setCreateWizardOpen(true)}>
+                  <Button type="button" variant="ghost" className="border border-white/15 bg-white/10 text-white hover:bg-white/20" onClick={openRoomWizard}>
                     New room
                   </Button>
                 </GlassCardHeader>
@@ -704,7 +721,7 @@ export default function DashboardPage() {
                         Use the quick start controls above to create a mission room or connect to an existing session.
                       </p>
                       <div className="mt-5 flex justify-center">
-                        <Button type="button" variant="primary" onClick={() => setCreateWizardOpen(true)}>
+                        <Button type="button" variant="primary" onClick={openRoomWizard}>
                           Launch room wizard
                         </Button>
                       </div>
