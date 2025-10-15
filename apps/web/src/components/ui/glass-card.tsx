@@ -3,7 +3,7 @@ import * as React from 'react';
 import { cn } from '../../lib/utils';
 
 export type GlassCardVariant = 'default' | 'elevated' | 'interactive';
-export type GlassCardGlowColor = 'purple' | 'blue' | 'green';
+export type GlassCardGlowColor = 'purple' | 'blue' | 'green' | 'cyan';
 export type GlassCardAnimationState = 'enter' | 'exit' | 'idle';
 
 export interface GlassCardProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -26,6 +26,8 @@ const glowColorStyles: Record<GlassCardGlowColor, string> = {
     'after:bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.32),transparent_60%)] group-hover:shadow-[0_52px_150px_-50px_rgba(59,130,246,0.82)]',
   green:
     'after:bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.3),transparent_60%)] group-hover:shadow-[0_52px_150px_-50px_rgba(16,185,129,0.78)]',
+  cyan:
+    'after:bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.3),transparent_60%)] group-hover:shadow-[0_52px_150px_-50px_rgba(34,211,238,0.8)]',
 };
 
 export const GlassCard = React.forwardRef<HTMLDivElement, GlassCardProps>(

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, type Transition, type Variants } from 'framer-motion';
 
 import AssetLibrary from '../../assets/components/AssetLibrary';
 import RecordingStudio from '../../recording/components/RecordingStudio';
@@ -20,30 +20,32 @@ import { formatBytes } from '../../../lib/format';
 import { useSessionStore } from '../../../state/session';
 import { useRecordingLibraryStore } from '../../recording/state';
 
-const sectionVariants = {
+const sectionEase: Transition['ease'] = [0.16, 1, 0.3, 1];
+
+const sectionVariants: Variants = {
   hidden: { opacity: 0, y: 24 },
-  visible: (index: number) => ({
+  visible: (custom: number = 0) => ({
     opacity: 1,
     y: 0,
     transition: {
       duration: 0.55,
-      ease: [0.16, 1, 0.3, 1],
-      delay: index * 0.08,
+      ease: sectionEase,
+      delay: custom * 0.08,
     },
   }),
 };
 
-const collapseVariants = {
+const collapseVariants: Variants = {
   initial: { height: 0, opacity: 0 },
   animate: {
     height: 'auto',
     opacity: 1,
-    transition: { duration: 0.35, ease: 'easeOut' as const },
+    transition: { duration: 0.35, ease: 'easeOut' },
   },
   exit: {
     height: 0,
     opacity: 0,
-    transition: { duration: 0.25, ease: 'easeIn' as const },
+    transition: { duration: 0.25, ease: 'easeIn' },
   },
 };
 
