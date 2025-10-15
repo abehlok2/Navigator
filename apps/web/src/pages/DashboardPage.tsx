@@ -13,7 +13,7 @@ import {
 } from '../components/ui/glass-card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
-import { StatusIndicator, type StatusIndicatorStatus } from '../components/ui/status-indicator';
+import { StatusIndicator } from '../components/ui/status-indicator';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select } from '../components/ui/select';
@@ -105,39 +105,15 @@ const formatRelativeTime = (value: string): string => {
   const diff = Date.now() - date.getTime();
   const minutes = Math.round(diff / 60000);
   if (minutes <= 1) return 'Just now';
-  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  if (hours < 24) return `${hours}h ago`;
   const days = Math.round(hours / 24);
-  return `${days} day${days === 1 ? '' : 's'} ago`;
-};
-
-const formatTimestamp = (value: string): string => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date);
+  return `${days}d ago`;
 };
 
 const formatRole = (role: Role | null): string =>
   role ? role.charAt(0).toUpperCase() + role.slice(1) : 'Unknown';
-
-const getInitials = (name: string): string =>
-  name
-    .split(' ')
-    .filter(Boolean)
-    .map(part => part[0]?.toUpperCase() ?? '')
-    .slice(0, 2)
-    .join('') || 'NV';
-
-const greetingForNow = (): string => {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 18) return 'Good afternoon';
-  return 'Good evening';
-};
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -283,23 +259,6 @@ export default function DashboardPage() {
     () =>
       sortedActiveSessions.reduce((acc, session) => acc + (sessionStats[session.roomId]?.online ?? 0), 0),
     [sessionStats, sortedActiveSessions],
-  );
-
-  const recentSessions = useMemo(() => sortedActiveSessions.slice(0, 4), [sortedActiveSessions]);
-
-  const recentRecordings = useMemo(
-    () =>
-      sortedActiveSessions.slice(0, 3).map((session, index) => {
-        const minutes = 14 + index * 3;
-        const seconds = (index * 17) % 60;
-        return {
-          id: `${session.roomId}-recording-${index}`,
-          title: `${session.label} — Capture ${index + 1}`,
-          timestamp: session.lastAccessed,
-          duration: `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`,
-        };
-      }),
-    [sortedActiveSessions],
   );
 
   const [createWizardOpen, setCreateWizardOpen] = useState(false);
@@ -537,19 +496,6 @@ export default function DashboardPage() {
   );
 
   const displayName = username ?? 'Navigator Operator';
-  const initials = useMemo(() => getInitials(displayName), [displayName]);
-  const greeting = useMemo(() => greetingForNow(), []);
-  const connectionStatus: StatusIndicatorStatus = connection === 'connected'
-    ? 'connected'
-    : connection === 'connecting'
-      ? 'connecting'
-      : 'disconnected';
-  const connectionLabel =
-    connection === 'connected'
-      ? 'Live session link'
-      : connection === 'connecting'
-        ? 'Negotiating link'
-        : 'Idle';
   const canCreateRoom = effectiveRole === 'facilitator';
 
   if (!token) {
@@ -561,512 +507,281 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="relative min-h-screen overflow-hidden">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.18),transparent_55%)]" aria-hidden />
-        <div className="relative mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-10">
-          <header className="flex flex-col gap-6">
-            <GlassCard variant="elevated" glowColor="blue" className="border-white/10 bg-white/[0.04]">
-              <GlassCardContent className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex flex-1 flex-col gap-3">
-                  <span className="text-xs font-semibold uppercase tracking-[0.4em] text-sky-200/80">Mission control</span>
-                  <h1 className="text-3xl font-semibold text-white sm:text-4xl">
-                    {greeting}, {displayName.split(' ')[0] ?? 'Operator'}
-                  </h1>
-                  <p className="max-w-xl text-sm text-slate-300 sm:text-base">
-                    Monitor active rooms, launch new collaborations, and jump back into live sessions without losing momentum.
-                  </p>
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    {[{
-                      label: 'Active rooms',
-                      value: sortedActiveSessions.length,
-                    }, {
-                      label: 'Participants tracked',
-                      value: totalParticipants,
-                    }, {
-                      label: 'Online right now',
-                      value: onlineParticipants,
-                    }].map(stat => (
-                      <motion.div
-                        key={stat.label}
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                        className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner"
-                      >
-                        <p className="text-xs uppercase tracking-[0.3em] text-slate-300/90">{stat.label}</p>
-                        <p className="mt-2 text-2xl font-semibold text-white">{stat.value}</p>
-                      </motion.div>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex min-w-[18rem] flex-col gap-4 rounded-3xl border border-white/10 bg-white/10 p-5 text-sm text-slate-100">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-full border border-white/20 bg-white/20 text-lg font-semibold text-white shadow-inner">
-                      {initials}
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-base font-semibold text-white">{displayName}</span>
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-200/80">
-                        <Badge variant="info">{formatRole(effectiveRole)}</Badge>
-                        <StatusIndicator status={connectionStatus} label={connectionLabel} size="sm" className="bg-white/5 px-2 py-1" />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-xs text-slate-200/90 shadow-inner">
-                    <p className="font-semibold uppercase tracking-[0.35em] text-slate-200">Latest sync</p>
-                    <p className="mt-2 font-mono text-sm text-white/90">{formatTimestamp(sortedActiveSessions[0]?.lastAccessed ?? new Date().toISOString())}</p>
-                    <p className="mt-1 text-xs text-slate-300">
-                      Stay within this dashboard to track updates across every mission room in real time.
-                    </p>
-                  </div>
-                </div>
-              </GlassCardContent>
-            </GlassCard>
-          </header>
+    <div className="min-h-screen bg-slate-950">
+      <div className="mx-auto max-w-7xl px-6 py-12">
+        {/* Header */}
+        <header className="mb-12">
+          <div className="mb-4">
+            <h1 className="text-4xl font-bold text-white mb-2">
+              Welcome back, {displayName.split(' ')[0]}
+            </h1>
+            <p className="text-lg text-slate-400">
+              {formatRole(effectiveRole)} • {sortedActiveSessions.length} active rooms
+            </p>
+          </div>
 
-          <main className="grid gap-6 xl:grid-cols-[2fr,1fr]">
-            <div className="flex flex-col gap-6">
-              <GlassCard variant="elevated" glowColor="purple" className="overflow-hidden border-white/10 bg-white/[0.05]">
-                <GlassCardHeader className="flex flex-col gap-3 border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <GlassCardTitle className="text-2xl text-white">Quick start</GlassCardTitle>
-                    <GlassCardDescription className="text-slate-200/80">
-                      Launch a new room or join an existing session with guided controls and smart defaults.
-                    </GlassCardDescription>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-slate-200/80">
-                    <span className="rounded-full border border-emerald-300/40 bg-emerald-500/10 px-3 py-1 font-semibold uppercase tracking-[0.3em] text-emerald-100">
-                      {canCreateRoom ? 'Facilitator' : 'Guest'} access
-                    </span>
-                  </div>
-                </GlassCardHeader>
-                <GlassCardContent className="gap-6">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Button
-                      type="button"
-                      variant="primary"
-                      glass
-                      size="lg"
-                      className="h-16 justify-between rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-500 text-left text-white shadow-[0_24px_60px_-30px_rgba(59,130,246,0.9)]"
-                      onClick={openRoomWizard}
-                    >
-                      <span className="flex flex-col text-left">
-                        <span className="text-sm uppercase tracking-[0.35em] text-white/80">Create</span>
-                        <span className="text-lg font-semibold">Launch room wizard</span>
-                      </span>
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-6 w-6"
-                        stroke="currentColor"
-                        strokeWidth={1.6}
-                      >
-                        <path d="M5 12h14" strokeLinecap="round" />
-                        <path d="M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      glass
-                      size="lg"
-                      className="h-16 justify-between rounded-2xl border border-white/15 bg-white/10 text-left text-white shadow-[0_20px_45px_-30px_rgba(148,163,184,0.8)]"
-                      onClick={() => setJoinModalOpen(true)}
-                    >
-                      <span className="flex flex-col text-left">
-                        <span className="text-sm uppercase tracking-[0.35em] text-white/70">Join</span>
-                        <span className="text-lg font-semibold">Open room joiner</span>
-                      </span>
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-6 w-6"
-                        stroke="currentColor"
-                        strokeWidth={1.6}
-                      >
-                        <path d="M12 5v14" strokeLinecap="round" />
-                        <path d="M19 12l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </Button>
-                  </div>
-                </GlassCardContent>
-                <GlassCardFooter className="flex flex-col gap-4 border-white/10 text-xs text-slate-200/80 sm:flex-row sm:items-center sm:justify-between">
-                  <span>Use the wizard for advanced room presets or jump straight into the Room Joiner to validate access credentials.</span>
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 uppercase tracking-[0.3em] text-slate-200">
-                      Secure by design
-                    </span>
-                  </div>
-                </GlassCardFooter>
-              </GlassCard>
-
-              <GlassCard variant="default" glowColor="blue" className="border-white/10 bg-white/[0.04]">
-                <GlassCardHeader className="flex flex-col gap-2 border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <GlassCardTitle className="text-2xl text-white">Active sessions</GlassCardTitle>
-                    <GlassCardDescription className="text-slate-200/80">
-                      Track the rooms you’ve recently prepared. Continue where you left off or retire inactive sessions.
-                    </GlassCardDescription>
-                  </div>
-                  <Button type="button" variant="ghost" className="border border-white/15 bg-white/10 text-white hover:bg-white/20" onClick={openRoomWizard}>
-                    New room
-                  </Button>
-                </GlassCardHeader>
-                <GlassCardContent className="gap-5">
-                  {sortedActiveSessions.length === 0 ? (
-                    <div className="rounded-3xl border border-dashed border-white/15 bg-white/5 p-8 text-center text-sm text-slate-200">
-                      <p className="text-base font-semibold text-white">No active rooms yet</p>
-                      <p className="mt-2 text-sm text-slate-200/80">
-                        Use the quick start controls above to create a mission room or connect to an existing session.
-                      </p>
-                      <div className="mt-5 flex justify-center">
-                        <Button type="button" variant="primary" onClick={openRoomWizard}>
-                          Launch room wizard
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <ul className="space-y-4">
-                      <AnimatePresence initial={false}>
-                        {sortedActiveSessions.map(session => {
-                          const stats = sessionStats[session.roomId] ?? { participants: 0, online: 0 };
-                          const scenarioLabel = session.scenario ? SCENARIO_LABELS[session.scenario] ?? 'Custom mission' : 'Custom mission';
-                          const status: StatusIndicatorStatus = stats.online > 0 ? 'connected' : 'disconnected';
-                          return (
-                            <motion.li
-                              key={session.roomId}
-                              initial={{ opacity: 0, y: 12 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -12 }}
-                              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                              className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_24px_45px_-35px_rgba(59,130,246,0.6)]"
-                            >
-                              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                                <div className="space-y-3">
-                                  <div className="flex flex-wrap items-center gap-3">
-                                    <h2 className="text-xl font-semibold text-white">{session.label}</h2>
-                                    <Badge variant="info" className="bg-sky-100/90 text-sky-700">
-                                      Room {session.roomId.slice(0, 8)}
-                                    </Badge>
-                                  </div>
-                                  <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-200/80">
-                                    <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">{scenarioLabel}</span>
-                                    <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">{formatRole(session.role ?? effectiveRole)}</span>
-                                    <span className={cn(
-                                      'rounded-full border px-3 py-1',
-                                      session.passwordEnabled
-                                        ? 'border-emerald-300/50 bg-emerald-500/10 text-emerald-100'
-                                        : 'border-white/15 bg-white/5 text-slate-200/80',
-                                    )}>
-                                      {session.passwordEnabled ? 'Password enabled' : 'Open access'}
-                                    </span>
-                                    <span className={cn(
-                                      'rounded-full border px-3 py-1',
-                                      session.autoRecord
-                                        ? 'border-emerald-300/50 bg-emerald-500/10 text-emerald-100'
-                                        : 'border-white/15 bg-white/5 text-slate-200/80',
-                                    )}>
-                                      {session.autoRecord ? 'Auto record on' : 'Manual capture'}
-                                    </span>
-                                    {session.allowObservers ? (
-                                      <span className="rounded-full border border-emerald-300/50 bg-emerald-500/10 px-3 py-1 text-emerald-100">
-                                        Observers enabled
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                  <div className="flex flex-wrap items-center gap-4 text-xs text-slate-200/80">
-                                    <span>Participants: {stats.participants}</span>
-                                    <span>Online: {stats.online}</span>
-                                    <span>Last accessed: {formatRelativeTime(session.lastAccessed)}</span>
-                                  </div>
-                                </div>
-                                <div className="flex flex-col gap-3 md:items-end">
-                                  <StatusIndicator status={status} label={status === 'connected' ? 'Participants online' : 'Waiting for attendees'} size="sm" />
-                                  <div className="flex flex-col gap-2 sm:flex-row">
-                                    <Button type="button" variant="primary" glass onClick={() => handleContinueSession(session.roomId)}>
-                                      Continue session
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      variant="danger"
-                                      onClick={() => {
-                                        void handleLeaveSession(session);
-                                      }}
-                                    >
-                                      Leave session
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                            </motion.li>
-                          );
-                        })}
-                      </AnimatePresence>
-                    </ul>
-                  )}
-                </GlassCardContent>
-              </GlassCard>
+          {/* Stats Grid */}
+          <div className="grid gap-6 sm:grid-cols-3 mt-8">
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-6">
+              <div className="text-sm text-slate-400 mb-1">Active Rooms</div>
+              <div className="text-3xl font-bold text-white">{sortedActiveSessions.length}</div>
             </div>
-
-            <div className="flex flex-col gap-6">
-              <GlassCard variant="default" glowColor="green" className="border-white/10 bg-white/[0.04]">
-                <GlassCardHeader className="border-white/10 pb-4">
-                  <GlassCardTitle className="text-2xl text-white">Recent activity</GlassCardTitle>
-                  <GlassCardDescription className="text-slate-200/80">
-                    Quick snapshots of the latest recordings and sessions you’ve touched.
-                  </GlassCardDescription>
-                </GlassCardHeader>
-                <GlassCardContent className="gap-6">
-                  <div className="grid gap-6 lg:grid-cols-2">
-                    <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold uppercase tracking-[0.35em] text-white/80">Recent recordings</p>
-                        <Badge variant="muted" className="bg-white/15 text-slate-200">Beta</Badge>
-                      </div>
-                      <div className="mt-4 space-y-4">
-                        {recentRecordings.length === 0 ? (
-                          <p className="text-sm text-slate-200/80">Recording archives will appear here after your first capture.</p>
-                        ) : (
-                          recentRecordings.map(item => (
-                            <motion.div
-                              key={item.id}
-                              initial={{ opacity: 0, x: -12 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                              className="rounded-2xl border border-white/10 bg-white/10 p-4"
-                            >
-                              <p className="text-sm font-semibold text-white">{item.title}</p>
-                              <p className="mt-1 text-xs text-slate-200/80">Captured {formatRelativeTime(item.timestamp)} • {item.duration}</p>
-                            </motion.div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                    <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold uppercase tracking-[0.35em] text-white/80">Recent sessions</p>
-                        <Badge variant="success" className="bg-emerald-200 text-emerald-900">Live</Badge>
-                      </div>
-                      <div className="mt-4 space-y-4">
-                        {recentSessions.length === 0 ? (
-                          <p className="text-sm text-slate-200/80">Your latest sessions will appear after you join or create a room.</p>
-                        ) : (
-                          recentSessions.map(session => (
-                            <motion.div
-                              key={`recent-${session.roomId}`}
-                              initial={{ opacity: 0, x: 12 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                              className="rounded-2xl border border-white/10 bg-white/10 p-4"
-                            >
-                              <div className="flex items-center justify-between gap-3">
-                                <p className="text-sm font-semibold text-white">{session.label}</p>
-                                <Badge variant="info" className="bg-sky-100/90 text-sky-700">
-                                  {sessionStats[session.roomId]?.online ?? 0} online
-                                </Badge>
-                              </div>
-                              <p className="mt-1 text-xs text-slate-200/80">Last touched {formatRelativeTime(session.lastAccessed)}</p>
-                              <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.25em] text-slate-200/80">
-                                <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1">{SCENARIO_LABELS[session.scenario ?? ''] ?? 'Custom mission'}</span>
-                                <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1">Room {session.roomId.slice(0, 6)}</span>
-                              </div>
-                            </motion.div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </GlassCardContent>
-              </GlassCard>
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-6">
+              <div className="text-sm text-slate-400 mb-1">Total Participants</div>
+              <div className="text-3xl font-bold text-white">{totalParticipants}</div>
             </div>
-          </main>
-        </div>
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-6">
+              <div className="text-sm text-slate-400 mb-1">Currently Online</div>
+              <div className="text-3xl font-bold text-emerald-400">{onlineParticipants}</div>
+            </div>
+          </div>
+        </header>
+
+        {/* Quick Actions */}
+        <section className="mb-12">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-semibold text-white">Quick Actions</h2>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <button
+              onClick={openRoomWizard}
+              className="group rounded-2xl bg-violet-600 p-8 text-left transition-all hover:bg-violet-500 hover:scale-[1.02]"
+            >
+              <div className="text-sm font-medium text-violet-200 mb-2">CREATE</div>
+              <div className="text-xl font-bold text-white mb-1">New Mission Room</div>
+              <div className="text-sm text-violet-100/80">Launch a new collaborative session</div>
+            </button>
+            <button
+              onClick={() => setJoinModalOpen(true)}
+              className="group rounded-2xl bg-white/5 border-2 border-white/10 p-8 text-left transition-all hover:bg-white/10 hover:border-white/20"
+            >
+              <div className="text-sm font-medium text-slate-400 mb-2">JOIN</div>
+              <div className="text-xl font-bold text-white mb-1">Existing Room</div>
+              <div className="text-sm text-slate-400">Connect to an active session</div>
+            </button>
+          </div>
+        </section>
+
+        {/* Active Sessions */}
+        <section>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-semibold text-white">Your Sessions</h2>
+          </div>
+
+          {sortedActiveSessions.length === 0 ? (
+            <div className="rounded-2xl border-2 border-dashed border-white/20 bg-white/5 p-12 text-center">
+              <p className="text-lg text-slate-300 mb-4">No active sessions</p>
+              <p className="text-sm text-slate-400 mb-6">Create a new room to get started</p>
+              <Button onClick={openRoomWizard} variant="primary">
+                Create Room
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <AnimatePresence>
+                {sortedActiveSessions.map(session => {
+                  const stats = sessionStats[session.roomId] ?? { participants: 0, online: 0 };
+                  const isActive = stats.online > 0;
+                  
+                  return (
+                    <motion.div
+                      key={session.roomId}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      className="rounded-2xl bg-white/5 border border-white/10 p-6 hover:bg-white/[0.07] transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-6">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-3">
+                            <h3 className="text-lg font-semibold text-white truncate">
+                              {session.label}
+                            </h3>
+                            {isActive && (
+                              <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-medium">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                Active
+                              </span>
+                            )}
+                          </div>
+                          
+                          <div className="flex flex-wrap gap-3 text-sm text-slate-400 mb-3">
+                            <span>Room {session.roomId.slice(0, 8)}</span>
+                            <span>•</span>
+                            <span>{stats.participants} participants</span>
+                            <span>•</span>
+                            <span>{stats.online} online</span>
+                            <span>•</span>
+                            <span>{formatRelativeTime(session.lastAccessed)}</span>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <Badge variant="info">
+                              {SCENARIO_LABELS[session.scenario ?? ''] ?? 'Custom'}
+                            </Badge>
+                            <Badge variant={session.passwordEnabled ? 'success' : 'muted'}>
+                              {session.passwordEnabled ? 'Secured' : 'Open'}
+                            </Badge>
+                            {session.autoRecord && (
+                              <Badge variant="muted">Recording</Badge>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => handleContinueSession(session.roomId)}
+                            variant="primary"
+                            size="sm"
+                          >
+                            Continue
+                          </Button>
+                          <Button
+                            onClick={() => handleLeaveSession(session)}
+                            variant="ghost"
+                            size="sm"
+                          >
+                            Leave
+                          </Button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
+          )}
+        </section>
       </div>
 
+      {/* Modals remain the same */}
       <Dialog.Root open={createWizardOpen} onOpenChange={setCreateWizardOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/75 backdrop-blur" />
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-sm" />
           <Dialog.Content className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
-              initial={{ opacity: 0, y: 24 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -24 }}
-              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-              className="relative w-full max-w-3xl"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-2xl rounded-2xl bg-slate-900 border border-white/10 p-8"
             >
-              <GlassCard variant="elevated" glowColor="purple" className="border-white/10 bg-white/[0.06]">
-                <GlassCardHeader className="flex flex-col gap-2 border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <Dialog.Title asChild>
-                      <GlassCardTitle className="text-2xl text-white">Create a mission room</GlassCardTitle>
-                    </Dialog.Title>
-                    <Dialog.Description asChild>
-                      <GlassCardDescription className="text-slate-200/80">
-                        Configure room presets, optional passwords, and participation rules before launching.
-                      </GlassCardDescription>
-                    </Dialog.Description>
+              <div className="flex items-start justify-between mb-6">
+                <div>
+                  <Dialog.Title className="text-2xl font-bold text-white mb-2">
+                    Create Mission Room
+                  </Dialog.Title>
+                  <Dialog.Description className="text-slate-400">
+                    Configure your new collaborative session
+                  </Dialog.Description>
+                </div>
+                <Dialog.Close className="rounded-lg p-2 hover:bg-white/10 transition-colors">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </Dialog.Close>
+              </div>
+
+              <div className="space-y-6">
+                <div>
+                  <Label htmlFor="wizard-name" className="text-white mb-2 block">Room Name</Label>
+                  <Input
+                    id="wizard-name"
+                    value={wizardName}
+                    onChange={e => setWizardName(e.target.value)}
+                    placeholder="Europa Mission Briefing"
+                    className="bg-white/5 border-white/10 text-white"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="wizard-template" className="text-white mb-2 block">Format</Label>
+                  <Select
+                    id="wizard-template"
+                    value={wizardTemplate}
+                    onChange={e => setWizardTemplate(e.target.value)}
+                    className="bg-white/5 border-white/10 text-white"
+                  >
+                    <option value="mission">Mission Rehearsal</option>
+                    <option value="workshop">Collaboration Workshop</option>
+                    <option value="review">Post-Mission Review</option>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="wizard-password" className="text-white mb-2 block">Password (Optional)</Label>
+                  <Input
+                    id="wizard-password"
+                    type="password"
+                    value={wizardPassword}
+                    onChange={e => setWizardPassword(e.target.value)}
+                    placeholder="Leave blank for open access"
+                    className="bg-white/5 border-white/10 text-white"
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <label className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10 cursor-pointer hover:bg-white/10">
+                    <div>
+                      <div className="text-white font-medium">Auto-record sessions</div>
+                      <div className="text-sm text-slate-400">Start recording automatically</div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={wizardAutoRecord}
+                      onChange={e => setWizardAutoRecord(e.target.checked)}
+                      className="w-5 h-5 rounded"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10 cursor-pointer hover:bg-white/10">
+                    <div>
+                      <div className="text-white font-medium">Allow observers</div>
+                      <div className="text-sm text-slate-400">Permit listen-only participants</div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={wizardAllowObservers}
+                      onChange={e => setWizardAllowObservers(e.target.checked)}
+                      className="w-5 h-5 rounded"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10 cursor-pointer hover:bg-white/10">
+                    <div>
+                      <div className="text-white font-medium">Start immediately</div>
+                      <div className="text-sm text-slate-400">Jump to session after creation</div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={wizardStartNow}
+                      onChange={e => setWizardStartNow(e.target.checked)}
+                      className="w-5 h-5 rounded"
+                    />
+                  </label>
+                </div>
+
+                {wizardError && (
+                  <div className="p-4 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300">
+                    {wizardError}
                   </div>
+                )}
+
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    onClick={handleWizardStart}
+                    loading={wizardSaving}
+                    variant="primary"
+                    className="flex-1"
+                  >
+                    Create Room
+                  </Button>
                   <Dialog.Close asChild>
-                    <button
-                      type="button"
-                      className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10 text-slate-100 transition hover:border-white/30 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-                    >
-                      <span className="sr-only">Close</span>
-                      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" stroke="currentColor" strokeWidth={1.6}>
-                        <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                  </Dialog.Close>
-                </GlassCardHeader>
-                <GlassCardContent className="gap-6">
-                  <div className="grid gap-5 lg:grid-cols-2">
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="wizard-name" className="text-sm text-slate-100">
-                          Room name
-                        </Label>
-                        <Input
-                          id="wizard-name"
-                          value={wizardName}
-                          onChange={event => setWizardName(event.target.value)}
-                          placeholder="e.g. Europa Mission Briefing"
-                          className="bg-white/10 text-white placeholder:text-slate-300"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="wizard-template" className="text-sm text-slate-100">
-                          Collaboration format
-                        </Label>
-                        <Select
-                          id="wizard-template"
-                          value={wizardTemplate}
-                          onChange={event => setWizardTemplate(event.target.value)}
-                          className="rounded-xl border-white/15 bg-white/10 text-white"
-                        >
-                          <option value="mission">Mission rehearsal</option>
-                          <option value="workshop">Collaboration workshop</option>
-                          <option value="review">Post-mission review</option>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="wizard-password" className="text-sm text-slate-100">
-                          Optional password
-                        </Label>
-                        <Input
-                          id="wizard-password"
-                          type="password"
-                          value={wizardPassword}
-                          onChange={event => setWizardPassword(event.target.value)}
-                          placeholder="Leave blank for open access"
-                          className="bg-white/10 text-white placeholder:text-slate-300"
-                        />
-                        <p className="text-xs text-slate-200/70">Passwords encrypt session entry requirements for invited participants.</p>
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <div className="grid gap-3 rounded-3xl border border-white/10 bg-white/5 p-4">
-                        <p className="text-sm font-semibold text-white">Room settings</p>
-                        <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-3">
-                          <div>
-                            <p className="text-sm text-white">Auto start recording</p>
-                            <p className="text-xs text-slate-200/70">Capture audio logs as soon as the room goes live.</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setWizardAutoRecord(value => !value)}
-                            className={cn(
-                              'relative h-9 w-16 rounded-full border transition-colors',
-                              wizardAutoRecord ? 'border-emerald-400 bg-emerald-500/30' : 'border-white/20 bg-white/10',
-                            )}
-                          >
-                            <span
-                              className={cn(
-                                'absolute top-1/2 h-7 w-7 -translate-y-1/2 transform rounded-full bg-white transition-transform',
-                                wizardAutoRecord ? 'translate-x-8' : 'translate-x-1',
-                              )}
-                            />
-                            <span className="sr-only">Toggle auto record</span>
-                          </button>
-                        </div>
-                        <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-3">
-                          <div>
-                            <p className="text-sm text-white">Allow observers</p>
-                            <p className="text-xs text-slate-200/70">Permit listen-only attendees without participant controls.</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setWizardAllowObservers(value => !value)}
-                            className={cn(
-                              'relative h-9 w-16 rounded-full border transition-colors',
-                              wizardAllowObservers ? 'border-emerald-400 bg-emerald-500/30' : 'border-white/20 bg-white/10',
-                            )}
-                          >
-                            <span
-                              className={cn(
-                                'absolute top-1/2 h-7 w-7 -translate-y-1/2 transform rounded-full bg-white transition-transform',
-                                wizardAllowObservers ? 'translate-x-8' : 'translate-x-1',
-                              )}
-                            />
-                            <span className="sr-only">Toggle observers</span>
-                          </button>
-                        </div>
-                        <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-3">
-                          <div>
-                            <p className="text-sm text-white">Auto-open session workspace</p>
-                            <p className="text-xs text-slate-200/70">Jump straight to the live session after creation.</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setWizardStartNow(value => !value)}
-                            className={cn(
-                              'relative h-9 w-16 rounded-full border transition-colors',
-                              wizardStartNow ? 'border-emerald-400 bg-emerald-500/30' : 'border-white/20 bg-white/10',
-                            )}
-                          >
-                            <span
-                              className={cn(
-                                'absolute top-1/2 h-7 w-7 -translate-y-1/2 transform rounded-full bg-white transition-transform',
-                                wizardStartNow ? 'translate-x-8' : 'translate-x-1',
-                              )}
-                            />
-                            <span className="sr-only">Toggle auto open</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  {wizardError && (
-                    <div className="rounded-2xl border border-rose-400/50 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
-                      {wizardError}
-                    </div>
-                  )}
-                </GlassCardContent>
-                <GlassCardFooter className="flex flex-col gap-3 border-white/10 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-xs text-slate-200/80">You can adjust these settings later from within the session controls.</p>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <Dialog.Close asChild>
-                      <Button type="button" variant="ghost" className="border border-white/15 bg-white/10 text-white hover:bg-white/20">
-                        Cancel
-                      </Button>
-                    </Dialog.Close>
-                    <Button
-                      type="button"
-                      variant="primary"
-                      glass
-                      loading={wizardSaving}
-                      spinnerLabel="Creating room"
-                      onClick={() => {
-                        void handleWizardStart();
-                      }}
-                    >
-                      {wizardSaving ? 'Creating…' : 'Start session'}
+                    <Button variant="ghost" className="flex-1">
+                      Cancel
                     </Button>
-                  </div>
-                </GlassCardFooter>
-              </GlassCard>
+                  </Dialog.Close>
+                </div>
+              </div>
             </motion.div>
           </Dialog.Content>
         </Dialog.Portal>
@@ -1074,27 +789,21 @@ export default function DashboardPage() {
 
       <Dialog.Root open={joinModalOpen} onOpenChange={setJoinModalOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/75 backdrop-blur" />
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-sm" />
           <Dialog.Content className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <Dialog.Title className="sr-only">Join a mission room</Dialog.Title>
-            <Dialog.Description className="sr-only">
-              Step through the room setup to connect with the right participant.
-            </Dialog.Description>
+            <Dialog.Title className="sr-only">Join Room</Dialog.Title>
+            <Dialog.Description className="sr-only">Connect to an existing session</Dialog.Description>
             <motion.div
-              initial={{ opacity: 0, scale: 0.94 }}
+              initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.94 }}
-              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-              className="relative w-full max-w-3xl"
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-2xl"
             >
               <Dialog.Close asChild>
-                <button
-                  type="button"
-                  className="absolute right-5 top-5 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10 text-slate-100 transition hover:border-white/30 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-                >
-                  <span className="sr-only">Close joiner</span>
-                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" stroke="currentColor" strokeWidth={1.6}>
-                    <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" strokeLinejoin="round" />
+                <button className="absolute right-5 top-5 z-10 rounded-lg p-2 hover:bg-white/10">
+                  <span className="sr-only">Close</span>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </Dialog.Close>
@@ -1109,10 +818,10 @@ export default function DashboardPage() {
                 participants={joinParticipants}
                 availableTargets={availableJoinTargets}
                 loadingParticipants={joinLoadingParticipants}
-                onRefreshParticipants={() => handleRefreshParticipants()}
+                onRefreshParticipants={handleRefreshParticipants}
                 targetId={joinTargetId}
                 onTargetChange={setJoinTargetId}
-                onConnect={() => handleJoinConnect()}
+                onConnect={handleJoinConnect}
                 connecting={joinConnecting}
                 participantId={null}
                 error={joinError}
