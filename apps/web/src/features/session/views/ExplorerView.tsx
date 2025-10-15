@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { AnimatePresence, motion, cubicBezier } from 'framer-motion';
+import { AnimatePresence, motion, cubicBezier, type Transition, type Variants } from 'framer-motion';
 
 import AssetLibrary from '../../assets/components/AssetLibrary';
 import RecordingStudio from '../../recording/components/RecordingStudio';
@@ -30,7 +30,7 @@ const sectionVariants: Variants = {
     transition: {
       duration: 0.55,
       ease: cubicBezier(0.16, 1, 0.3, 1),
-      delay: index * 0.08,
+      delay: custom * 0.08,
     },
   }),
 };

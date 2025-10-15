@@ -428,7 +428,7 @@ export default function DashboardPage() {
   const handleJoinCreateRoom = useCallback(async () => {
     if (!token) {
       setJoinError('Authentication token is missing.');
-      return;
+      return false;
     }
     setJoinCreatingRoom(true);
     setJoinError(null);
@@ -442,9 +442,11 @@ export default function DashboardPage() {
         role: effectiveRole,
         passwordEnabled: false,
       });
+      return true;
     } catch (err) {
       console.error(err);
       setJoinError('Failed to create room.');
+      return false;
     } finally {
       setJoinCreatingRoom(false);
     }
@@ -1101,7 +1103,7 @@ export default function DashboardPage() {
                 onRoomIdChange={setJoinRoomId}
                 canCreateRoom={canCreateRoom}
                 creatingRoom={joinCreatingRoom}
-                onCreateRoom={() => handleJoinCreateRoom()}
+                onCreateRoom={handleJoinCreateRoom}
                 joinPassword={joinPassword}
                 onJoinPasswordChange={setJoinPassword}
                 participants={joinParticipants}
