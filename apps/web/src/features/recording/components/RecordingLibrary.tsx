@@ -33,7 +33,7 @@ import {
   type RecordingItem,
 } from '../state';
 
-const MotionGlassCard = motion(GlassCard);
+const MotionGlassCard = motion.create(GlassCard);
 
 type SortOption = 'newest' | 'oldest' | 'duration-desc' | 'duration-asc';
 type DurationFilter = 'all' | 'short' | 'medium' | 'long';
@@ -450,11 +450,15 @@ function NotesDialog({ recording, open, onClose, onSave }: NotesDialogProps) {
           >
             <GlassCard variant="elevated" glowColor="purple" className="space-y-6">
               <GlassCardHeader className="mb-2 flex flex-col gap-3 border-b border-white/10 pb-4">
-                <GlassCardTitle className="text-2xl text-white">Add session notes</GlassCardTitle>
-                <GlassCardDescription>
-                  Capture what stood out, identify highlights, or jot down follow-up tasks linked to this
-                  recording.
-                </GlassCardDescription>
+                <Dialog.Title asChild>
+                  <GlassCardTitle className="text-2xl text-white">Add session notes</GlassCardTitle>
+                </Dialog.Title>
+                <Dialog.Description asChild>
+                  <GlassCardDescription>
+                    Capture what stood out, identify highlights, or jot down follow-up tasks linked to this
+                    recording.
+                  </GlassCardDescription>
+                </Dialog.Description>
               </GlassCardHeader>
               <GlassCardContent className="gap-5">
                 <div className="space-y-2">
@@ -604,11 +608,15 @@ function PlaybackModal({
               <GlassCardHeader className="border-b border-white/10 pb-4">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <GlassCardTitle className="text-3xl text-white">Session playback</GlassCardTitle>
-                    <GlassCardDescription className="text-base text-slate-200/80">
-                      Dive into the full-resolution waveform, refine notes, and export takes for sharing or
-                      archival.
-                    </GlassCardDescription>
+                    <Dialog.Title asChild>
+                      <GlassCardTitle className="text-3xl text-white">Session playback</GlassCardTitle>
+                    </Dialog.Title>
+                    <Dialog.Description asChild>
+                      <GlassCardDescription className="text-base text-slate-200/80">
+                        Dive into the full-resolution waveform, refine notes, and export takes for sharing or
+                        archival.
+                      </GlassCardDescription>
+                    </Dialog.Description>
                   </div>
                   <Button
                     variant="ghost"

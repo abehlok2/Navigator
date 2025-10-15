@@ -25,7 +25,7 @@ const MIN_GAIN_DB = -60;
 const MAX_GAIN_DB = 6;
 const SILENCE_GAIN_DB = -90;
 
-const MotionGlassCard = motion(GlassCard);
+const MotionGlassCard = motion.create(GlassCard);
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const clampGain = (value: number) => {
