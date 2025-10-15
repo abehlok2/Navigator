@@ -23,6 +23,13 @@ import {
 import { connectWithReconnection } from '../features/webrtc/connection';
 import { Button } from '../components/ui/button';
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '../components/ui/card';
+import {
   GlassCard,
   GlassCardContent,
   GlassCardDescription,
@@ -167,6 +174,12 @@ export default function SessionPage() {
     if (sessionRole) return sessionRole;
     return isRole(authRole) ? authRole : null;
   }, [authRole, sessionRole]);
+
+  const isFacilitatorSession = effectiveRole === 'facilitator';
+  const isExplorerSession = effectiveRole === 'explorer';
+  const isListenerSession = effectiveRole === 'listener';
+  const canCreateRoom = isFacilitatorSession;
+  const canModerateParticipants = isFacilitatorSession;
 
   const availableTargets = useMemo(() => {
     const others = participants.filter(p => p.id !== participantId);
@@ -439,9 +452,6 @@ export default function SessionPage() {
   if (!token) {
     return <AuthForm />;
   }
-
-  const canCreateRoom = effectiveRole === 'facilitator';
-  const canModerateParticipants = effectiveRole === 'facilitator';
 
   const connectionPhase: SessionPhase = error
     ? 'error'
