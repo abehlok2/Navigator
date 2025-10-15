@@ -36,15 +36,15 @@ import {
   Trash2,
 } from 'lucide-react';
 
-import { Button } from '../../../components/ui/button';
-import { GlassCard, GlassCardContent, GlassCardHeader, GlassCardTitle } from '../../../components/ui/glass-card';
-import { Input } from '../../../components/ui/input';
-import { Label } from '../../../components/ui/label';
-import { useSessionStore } from '../../../state/session';
-import { cn } from '../../../lib/utils';
-import { getAudioContext } from '../../audio/context';
-import { registerRawAsset } from '../../audio/assets';
-import type { AssetManifest } from '../../control/protocol';
+import { Button } from '../../components/ui/button';
+import { GlassCard, GlassCardContent, GlassCardHeader, GlassCardTitle } from '../../components/ui/glass-card';
+import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
+import { useSessionStore } from '../../state/session';
+import { cn } from '../../lib/utils';
+import { getAudioContext } from '../audio/context';
+import { registerRawAsset } from '../audio/assets';
+import type { AssetManifest } from '../control/protocol';
 
 interface ManifestDraftEntry {
   key: string;
@@ -802,9 +802,10 @@ export default function ManifestEditor() {
   const updateEntries = useCallback(
     (updater: (entries: ManifestDraftEntry[]) => ManifestDraftEntry[] | void) => {
       setDraftEntries(prev => {
-        const next = updater(prev) ?? prev;
-        mergeValidation(next, hasValidated, setEntryErrors, setGlobalErrors);
-        return Array.isArray(next) ? next : prev;
+        const result = updater(prev);
+        const nextEntries = Array.isArray(result) ? result : prev;
+        mergeValidation(nextEntries, hasValidated, setEntryErrors, setGlobalErrors);
+        return nextEntries;
       });
     },
     [hasValidated, setEntryErrors, setGlobalErrors],

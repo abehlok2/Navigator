@@ -26,7 +26,7 @@ interface VariantDefinition {
 }
 
 export interface ButtonProps
-  extends Omit<HTMLMotionProps<"button">, "color"> {
+  extends Omit<HTMLMotionProps<"button">, "color" | "children"> {
   /** Visual style of the button. */
   variant?: ButtonVariant;
   /** Size scale of the button. */
@@ -41,6 +41,8 @@ export interface ButtonProps
   trailingIcon?: React.ReactNode;
   /** Accessible label announced while loading. */
   spinnerLabel?: string;
+  /** Button contents. */
+  children?: React.ReactNode;
 }
 
 const HEX_PATTERN = /^#(?:[0-9a-fA-F]{3}){1,2}$/;

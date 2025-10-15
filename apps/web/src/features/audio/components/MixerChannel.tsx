@@ -56,6 +56,10 @@ export interface MixerChannelProps {
   assetId: string;
   /** Optional friendly name shown at the top of the strip. */
   assetName?: string;
+  /** When true, disables channel interactions. */
+  disabled?: boolean;
+  /** Remote loading status override reported by the facilitator view. */
+  status?: 'ready' | 'pending' | 'missing';
   /** Current gain value in dB. When omitted the component manages its own state. */
   gainDb?: number;
   /** Initial gain in dB used when the component is uncontrolled. */
@@ -95,6 +99,8 @@ export interface MixerChannelProps {
 export function MixerChannel({
   assetId,
   assetName,
+  status,
+  disabled = false,
   gainDb: gainDbProp,
   initialGainDb = 0,
   meterRmsDb,
@@ -115,7 +121,11 @@ export function MixerChannel({
 }: MixerChannelProps) {
   const manifestEntry = useSessionStore(useCallback(state => state.manifest[assetId], [assetId]));
   const peerClock = useSessionStore(state => state.peerClock);
-  const assetLoaded = useSessionStore(state => state.assets.has(assetId));
+  const storeAssetLoaded = useSessionStore(state => state.assets.has(assetId));
+
+  const resolvedStatus = status ?? (storeAssetLoaded ? 'ready' : 'pending');
+  const assetLoaded = resolvedStatus === 'ready';
+  const interactionsDisabled = disabled || !assetLoaded;
 
   const [internalGain, setInternalGain] = useState(() => clampGain(gainDbProp ?? initialGainDb));
   const [internalMuted, setInternalMuted] = useState(isMutedProp ?? false);
@@ -177,23 +187,25 @@ export function MixerChannel({
   );
 
   const handleMuteToggle = useCallback(() => {
+    if (disabled) return;
     const next = !muted;
     if (isMutedProp === undefined) {
       setInternalMuted(next);
     }
     onMuteChange?.(next);
-  }, [isMutedProp, muted, onMuteChange]);
+  }, [disabled, isMutedProp, muted, onMuteChange]);
 
   const handleSoloToggle = useCallback(() => {
+    if (disabled) return;
     const next = !solo;
     if (isSoloProp === undefined) {
       setInternalSolo(next);
     }
     onSoloChange?.(next);
-  }, [isSoloProp, solo, onSoloChange]);
+  }, [disabled, isSoloProp, solo, onSoloChange]);
 
   const handlePlay = useCallback(() => {
-    if (!assetLoaded) return;
+    if (interactionsDisabled) return;
     if (!peerClock) {
       console.warn('MixerChannel: cannot start playback without a peer clock.');
       return;
@@ -207,15 +219,16 @@ export function MixerChannel({
     } catch (error) {
       console.error('MixerChannel: failed to start playback', error);
     }
-  }, [assetId, assetLoaded, gainDb, isPlayingProp, muted, onPlay, peerClock]);
+  }, [assetId, gainDb, interactionsDisabled, isPlayingProp, muted, onPlay, peerClock]);
 
   const handleStop = useCallback(() => {
+    if (disabled) return;
     stop(assetId);
     if (isPlayingProp === undefined) {
       setInternalPlaying(false);
     }
     onStop?.();
-  }, [assetId, isPlayingProp, onStop]);
+  }, [assetId, disabled, isPlayingProp, onStop]);
 
   const handlePanChange = useCallback(
     (value: number[]) => {
@@ -286,8 +299,21 @@ export function MixerChannel({
               : 'bg-amber-500/15 text-amber-200'
           )}
         >
-          <span className={cn('h-1.5 w-1.5 rounded-full', assetLoaded ? 'bg-emerald-400' : 'bg-amber-300')} />
-          {assetLoaded ? 'Ready' : 'Pending'}
+          <span
+            className={cn(
+              'h-1.5 w-1.5 rounded-full',
+              resolvedStatus === 'ready'
+                ? 'bg-emerald-400'
+                : resolvedStatus === 'missing'
+                  ? 'bg-rose-400'
+                  : 'bg-amber-300',
+            )}
+          />
+          {resolvedStatus === 'ready'
+            ? 'Ready'
+            : resolvedStatus === 'missing'
+              ? 'Missing'
+              : 'Pending'}
         </div>
       </div>
 
@@ -346,6 +372,7 @@ export function MixerChannel({
             size="sm"
             variant="secondary"
             glass
+            disabled={disabled}
             onClick={handleMuteToggle}
             className={cn(
               'justify-start gap-2 px-4 py-2 text-xs uppercase tracking-[0.3em]',
@@ -362,6 +389,7 @@ export function MixerChannel({
             size="sm"
             variant="ghost"
             glass
+            disabled={disabled}
             onClick={handleSoloToggle}
             className={cn(
               'justify-start gap-2 px-4 py-2 text-xs uppercase tracking-[0.3em]',
@@ -381,7 +409,7 @@ export function MixerChannel({
             size="sm"
             variant="primary"
             glass
-            disabled={!assetLoaded}
+            disabled={interactionsDisabled}
             onClick={handlePlay}
             className="gap-2 px-4 py-2 text-xs uppercase tracking-[0.3em]"
           >
@@ -393,7 +421,7 @@ export function MixerChannel({
             size="sm"
             variant="ghost"
             glass
-            disabled={!playing}
+            disabled={disabled || !playing}
             onClick={handleStop}
             className="gap-2 px-4 py-2 text-xs uppercase tracking-[0.3em]"
           >
@@ -415,17 +443,18 @@ export function MixerChannel({
                 <Disc3 className="h-3 w-3" />
               </span>
             </div>
-            <Slider.Root
-              value={[pan]}
-              min={-1}
-              max={1}
-              step={0.01}
-              onValueChange={handlePanChange}
-              onValueCommit={handlePanChange}
-              orientation="horizontal"
-              className="relative flex h-10 w-full select-none items-center"
-              onDoubleClick={handlePanReset}
-            >
+          <Slider.Root
+            value={[pan]}
+            min={-1}
+            max={1}
+            step={0.01}
+            onValueChange={handlePanChange}
+            onValueCommit={handlePanChange}
+            orientation="horizontal"
+            className="relative flex h-10 w-full select-none items-center"
+            onDoubleClick={handlePanReset}
+            disabled={disabled}
+          >
               <Slider.Track className="relative h-1.5 w-full overflow-hidden rounded-full bg-slate-800/80">
                 <Slider.Range className="absolute left-0 top-0 h-full bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-400 shadow-[0_0_18px_rgba(59,130,246,0.35)]" />
               </Slider.Track>

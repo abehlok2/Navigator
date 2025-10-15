@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import type { TooltipProps } from 'recharts';
+import type { TooltipContentProps } from 'recharts';
 
 import {
   GlassCard,
@@ -173,7 +173,7 @@ const MetricTile: React.FC<{
   </div>
 );
 
-const QualityTooltip: React.FC<TooltipProps<number, string> & { now: number }> = ({
+const QualityTooltip: React.FC<TooltipContentProps<number, string> & { now: number }> = ({
   active,
   payload,
   now,
@@ -298,17 +298,21 @@ export default function ConnectionStatus() {
           ? 'Minor degradation detected—monitor closely.'
           : 'Severe packet drop—check network conditions.';
 
-  const countdownLabel =
-    heartbeatAgeSeconds === null
-      ? 'Awaiting first heartbeat.'
-      : countdownSeconds === 0
-        ? 'Link will recycle if heartbeat remains idle.'
-        : `Stale in ${countdownSeconds.toFixed(1)}s`;
+  const countdownLabel = React.useMemo(() => {
+    if (heartbeatAgeSeconds === null) {
+      return 'Awaiting first heartbeat.';
+    }
+    const remaining = countdownSeconds ?? 0;
+    if (remaining <= 0) {
+      return 'Link will recycle if heartbeat remains idle.';
+    }
+    return `Stale in ${remaining.toFixed(1)}s`;
+  }, [countdownSeconds, heartbeatAgeSeconds]);
 
   const statusCopy = STATUS_COPY[connection];
   const gradientId = React.useId();
   const tooltipRenderer = React.useCallback(
-    (props: TooltipProps<number, string>) => <QualityTooltip {...props} now={now} />,
+    (props: TooltipContentProps<number, string>) => <QualityTooltip {...props} now={now} />,
     [now],
   );
 

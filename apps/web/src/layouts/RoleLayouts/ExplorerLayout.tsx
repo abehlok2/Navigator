@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { motion } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 
 import {
   GlassCard,
@@ -11,29 +11,26 @@ import {
 } from '../../components/ui/glass-card';
 
 import { cn } from '../../lib/utils';
+import type { RoleLayoutProps } from './types';
 
-export interface RoleLayoutProps {
-  children: React.ReactNode;
-}
-
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0, y: 18 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] },
+    transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] as const },
   },
 };
 
-const cardVariants = {
+const cardVariants: Variants = {
   hidden: { opacity: 0, y: 28 },
-  visible: (index: number) => ({
+  visible: (custom: number = 0) => ({
     opacity: 1,
     y: 0,
     transition: {
       duration: 0.55,
-      ease: [0.16, 1, 0.3, 1],
-      delay: index * 0.08,
+      ease: [0.16, 1, 0.3, 1] as const,
+      delay: custom * 0.08,
     },
   }),
 };

@@ -371,10 +371,8 @@ export default function FacilitatorMixerPanel() {
                 {loadedChannels.map(entry => (
                   <MixerChannel
                     key={entry.id}
-                    id={entry.id}
-                    title={entry.title}
-                    notes={entry.notes}
-                    bytes={entry.bytes}
+                    assetId={entry.id}
+                    assetName={entry.title}
                     gainDb={channelGains[entry.id] ?? 0}
                     status={statusById(entry.id)}
                     onGainChange={value => handleChannelGainChange(entry.id, value)}
