@@ -10,25 +10,16 @@ import {
 import { useSessionStore } from '../../state/session';
 import { startMixRecording, type RecordingHandle, type RecordingLevels } from '../audio/recorder';
 import { formatBytes } from '../../lib/format';
-
-interface RecordingItem {
-  id: string;
-  url: string;
-  createdAt: number;
-  size: number;
-  durationSec: number;
-  mimeType: string;
-  channels: number;
-  filename: string;
-}
+import { useRecordingLibraryStore, type RecordingItem } from '../recording/state';
 
 export default function RecordingControls() {
   const micStream = useSessionStore(state => state.micStream);
   const [recording, setRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [recordings, setRecordings] = useState<RecordingItem[]>([]);
+  const recordings = useRecordingLibraryStore(state => state.recordings);
+  const addRecording = useRecordingLibraryStore(state => state.addRecording);
+  const removeRecording = useRecordingLibraryStore(state => state.removeRecording);
   const handleRef = useRef<RecordingHandle | null>(null);
-  const urlsRef = useRef<string[]>([]);
   const meterFrameRef = useRef<number | null>(null);
   const [levels, setLevels] = useState<RecordingLevels>({ left: -120, right: -120 });
 
@@ -104,33 +95,19 @@ export default function RecordingControls() {
     const url = URL.createObjectURL(blob);
     const durationSec = Math.max(0, (createdAt - startedAt) / 1000);
     const filename = createFilename(createdAt, blob.type);
-    urlsRef.current.push(url);
-    setRecordings(prev => [
-      {
-        id: `session-mix-${createdAt}`,
-        url,
-        createdAt,
-        size: blob.size,
-        durationSec,
-        mimeType: blob.type || 'audio/webm',
-        channels: 2,
-        filename,
-      },
-      ...prev,
-    ]);
-  }, [stopMetering]);
-
-  const removeRecording = useCallback((id: string) => {
-    setRecordings(prev => {
-      const next = prev.filter(item => item.id !== id);
-      const removed = prev.find(item => item.id === id);
-      if (removed) {
-        URL.revokeObjectURL(removed.url);
-        urlsRef.current = urlsRef.current.filter(url => url !== removed.url);
-      }
-      return next;
-    });
-  }, []);
+    const item: RecordingItem = {
+      id: `session-mix-${createdAt}`,
+      url,
+      createdAt,
+      size: blob.size,
+      durationSec,
+      mimeType: blob.type || 'audio/webm',
+      channels: 2,
+      filename,
+      tags: [],
+    };
+    addRecording(item);
+  }, [addRecording, stopMetering]);
 
   useEffect(() => {
     if (!canRecord && recording) {
@@ -144,8 +121,6 @@ export default function RecordingControls() {
         void handleRef.current.stop();
       }
       stopMetering();
-      urlsRef.current.forEach(url => URL.revokeObjectURL(url));
-      urlsRef.current = [];
     };
   }, [stopMetering]);
 
