@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import ConnectionStatus from '../features/session/ConnectionStatus';
 import { connectWithReconnection } from '../features/webrtc/connection';
 import AssetDropZone from '../features/ui/AssetDropZone';
-import AssetAvailability from '../features/ui/AssetAvailability';
+import AssetLibrary from '../features/assets/components/AssetLibrary';
 import FacilitatorControls from '../features/ui/FacilitatorControls';
 import RecordingControls from '../features/ui/RecordingControls';
 import TelemetryDisplay from '../features/ui/TelemetryDisplay';
@@ -442,7 +442,7 @@ export default function SessionPage() {
                 </CardHeader>
                 <CardContent className="space-y-6 pt-0">
                   <AssetDropZone />
-                  <AssetAvailability />
+                  <AssetLibrary />
                 </CardContent>
               </Card>
             )}
