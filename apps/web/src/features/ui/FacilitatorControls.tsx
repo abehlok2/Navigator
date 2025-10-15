@@ -9,7 +9,9 @@ import {
 } from '../../components/ui/card';
 import { useSessionStore } from '../../state/session';
 import { getRawAssetById } from '../audio/assets';
+import DuckingEditor from '../audio/components/DuckingEditor';
 import ManifestEditor from './ManifestEditor';
+import FacilitatorMixerPanel from '../audio/components/FacilitatorMixerPanel';
 
 type EntryStatusPhase = 'idle' | 'loading' | 'unloading' | 'success' | 'error';
 
@@ -30,14 +32,6 @@ export default function FacilitatorControls() {
   const remoteAssetSet = remoteAssets;
   const remoteMissingSet = remoteMissing;
   const [status, setStatus] = useState<Record<string, EntryStatus>>({});
-
-  const [gain, setGain] = useState<Record<string, number>>({});
-  const handlePlay = (id: string) => control?.play({ id }).catch(() => {});
-  const handleStop = (id: string) => control?.stop({ id }).catch(() => {});
-  const handleGain = (id: string, value: number) => {
-    setGain(g => ({ ...g, [id]: value }));
-    control?.setGain({ id, gainDb: value }).catch(() => {});
-  };
 
   useEffect(() => {
     setStatus(prev => {
@@ -83,6 +77,13 @@ export default function FacilitatorControls() {
   const updateStatus = useCallback((id: string, next: EntryStatus) => {
     setStatus(prev => ({ ...prev, [id]: next }));
   }, []);
+
+  const handleCrossfade = useCallback(() => {
+    const loaded = manifestEntries.filter(entry => remoteAssetSet.has(entry.id)).map(entry => entry.id);
+    if (loaded.length >= 2) {
+      control?.crossfade({ fromId: loaded[0], toId: loaded[1], duration: 2 }).catch(() => {});
+    }
+  }, [control, manifestEntries, remoteAssetSet]);
 
   const toDataUrl = useCallback((data: ArrayBuffer, mimeType?: string) => {
     const bytes = new Uint8Array(data);
@@ -161,43 +162,6 @@ export default function FacilitatorControls() {
     }
   };
 
-  const [duck, setDuck] = useState(false);
-  const [threshold, setThreshold] = useState(-40);
-  const [reduction, setReduction] = useState(-12);
-  const attackMs = 10;
-  const releaseMs = 300;
-
-  const sendDucking = (enabled: boolean, nextThreshold = threshold, nextReduction = reduction) => {
-    control
-      ?.ducking({
-        enabled,
-        thresholdDb: nextThreshold,
-        reduceDb: nextReduction,
-        attackMs,
-        releaseMs,
-      })
-      .catch(() => {});
-  };
-
-  const toggleDucking = () => {
-    const next = !duck;
-    setDuck(next);
-    sendDucking(next);
-  };
-
-  const updateThreshold = (value: number) => {
-    setThreshold(value);
-    if (duck) {
-      sendDucking(true, value, reduction);
-    }
-  };
-
-  const updateReduction = (value: number) => {
-    setReduction(value);
-    if (duck) {
-      sendDucking(true, threshold, value);
-    }
-  };
 
   const inlineButtonClass =
     'rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40';
@@ -272,46 +236,13 @@ export default function FacilitatorControls() {
                   </div>
                 </div>
                 {entryStatus?.message && <div className={statusTone(entryStatus.phase)}>{entryStatus.message}</div>}
-                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
-                    <button
-                      type="button"
-                      onClick={() => handlePlay(id)}
-                      disabled={!remoteAssetSet.has(id) || !control}
-                      className={inlineButtonClass}
-                    >
-                      Play
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleStop(id)}
-                      disabled={!remoteAssetSet.has(id) || !control}
-                      className={inlineButtonClass}
-                    >
-                      Stop
-                    </button>
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
-                      Remote {remoteAssetSet.has(id) ? 'ready' : 'pending'}
-                    </span>
-                  </div>
-                  <label className="flex w-full flex-col gap-2 text-xs text-slate-500 sm:max-w-md">
-                    <span className="font-semibold uppercase tracking-wide text-slate-400">Gain</span>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="range"
-                        min={-60}
-                        max={6}
-                        step={1}
-                        value={gain[id] ?? 0}
-                        onChange={e => handleGain(id, Number(e.target.value))}
-                        disabled={!remoteAssetSet.has(id) || !control}
-                        className="h-1.5 flex-1 appearance-none rounded-full bg-slate-200 accent-blue-600 disabled:opacity-50"
-                      />
-                      <span className="w-16 text-right text-xs font-semibold text-slate-600">
-                        {(gain[id] ?? 0).toFixed(0)} dB
-                      </span>
-                    </div>
-                  </label>
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
+                    Remote {remoteAssetSet.has(id) ? 'ready' : 'pending'}
+                  </span>
+                  <span className="rounded-full bg-indigo-100 px-3 py-1 text-[11px] font-semibold text-indigo-700">
+                    Use mixer panel for transport &amp; gain
+                  </span>
                 </div>
               </li>
             );
@@ -334,58 +265,8 @@ export default function FacilitatorControls() {
             </Button>
           </div>
         )}
-        <div className="rounded-2xl border border-slate-200/80 bg-white/70 p-4 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="text-sm font-semibold text-slate-700">Automatic ducking</div>
-              <div className="text-xs text-slate-500">
-                Remote speech is mixed with the local microphone fallback before driving ducking.
-              </div>
-            </div>
-            <label className="flex items-center gap-3 text-sm font-semibold text-slate-700">
-              <input
-                type="checkbox"
-                checked={duck}
-                onChange={toggleDucking}
-                className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-              />
-              Enable ducking
-            </label>
-          </div>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-              Threshold
-              <input
-                type="range"
-                min={-80}
-                max={-10}
-                step={1}
-                value={threshold}
-                onChange={e => updateThreshold(Number(e.target.value))}
-                disabled={!control}
-                className="h-1.5 appearance-none rounded-full bg-slate-200 accent-emerald-600 disabled:opacity-50"
-              />
-              <span className="text-sm font-medium text-slate-600">{threshold} dBFS</span>
-            </label>
-            <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-              Reduction
-              <input
-                type="range"
-                min={-24}
-                max={0}
-                step={1}
-                value={reduction}
-                onChange={e => updateReduction(Number(e.target.value))}
-                disabled={!control}
-                className="h-1.5 appearance-none rounded-full bg-slate-200 accent-emerald-600 disabled:opacity-50"
-              />
-              <span className="text-sm font-medium text-slate-600">{reduction} dB</span>
-            </label>
-          </div>
-          <div className="mt-3 text-xs text-slate-500">
-            Attack {attackMs} ms · Release {releaseMs} ms
-          </div>
-        </div>
+        <DuckingEditor control={control} />
+        <FacilitatorMixerPanel />
       </CardContent>
     </Card>
   );
