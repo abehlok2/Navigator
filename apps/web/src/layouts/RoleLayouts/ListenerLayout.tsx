@@ -1,9 +1,5 @@
 import * as React from 'react';
 import { motion, type Variants } from 'framer-motion';
-
-export interface RoleLayoutProps {
-  children: React.ReactNode;
-}
 import {
   GlassCard,
   GlassCardContent,
