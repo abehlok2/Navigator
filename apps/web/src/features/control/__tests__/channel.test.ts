@@ -48,6 +48,7 @@ describe('ControlChannel message handling', () => {
     vi.doMock('../../audio/context', () => ({
       __esModule: true,
       getMasterGain: vi.fn(() => ({})),
+      getProgramBus: vi.fn(() => ({})),
       getAudioContext: vi.fn(() => ({ decodeAudioData: vi.fn() })),
     }));
     vi.doMock('../../audio/ducking', () => ({
@@ -129,6 +130,7 @@ describe('ControlChannel message handling', () => {
     vi.doMock('../../audio/context', () => ({
       __esModule: true,
       getMasterGain: vi.fn(() => 'master-gain'),
+      getProgramBus: vi.fn(() => 'program-bus'),
       getAudioContext: vi.fn(() => ({ decodeAudioData: vi.fn() })),
     }));
     vi.doMock('../../audio/ducking', () => ({
@@ -174,7 +176,7 @@ describe('ControlChannel message handling', () => {
     dc.send.mockClear();
     dc.emit('message', enableMessage);
 
-    expect(setupSpeechDucking).toHaveBeenCalledWith('master-gain', {
+    expect(setupSpeechDucking).toHaveBeenCalledWith('program-bus', {
       thresholdDb: -42,
       reducedDb: -9,
       attack: 0.02,
@@ -227,6 +229,7 @@ describe('ControlChannel message handling', () => {
     vi.doMock('../../audio/context', () => ({
       __esModule: true,
       getMasterGain: vi.fn(() => ({})),
+      getProgramBus: vi.fn(() => ({})),
       getAudioContext: vi.fn(() => ({ decodeAudioData: vi.fn() })),
     }));
     vi.doMock('../../audio/ducking', () => ({
@@ -301,6 +304,7 @@ describe('ControlChannel message handling', () => {
     vi.doMock('../../audio/context', () => ({
       __esModule: true,
       getMasterGain: vi.fn(() => ({})),
+      getProgramBus: vi.fn(() => ({})),
       getAudioContext: vi.fn(() => ({ decodeAudioData: vi.fn() })),
     }));
     vi.doMock('../../audio/ducking', () => ({
@@ -389,6 +393,7 @@ describe('ControlChannel message handling', () => {
     vi.doMock('../../audio/context', () => ({
       __esModule: true,
       getMasterGain: vi.fn(() => ({})),
+      getProgramBus: vi.fn(() => ({})),
       getAudioContext: vi.fn(() => ({ decodeAudioData: vi.fn() })),
     }));
     vi.doMock('../../audio/ducking', () => ({
@@ -598,6 +603,7 @@ describe('ControlChannel message handling', () => {
     vi.doMock('../../audio/context', () => ({
       __esModule: true,
       getMasterGain: vi.fn(() => ({})),
+      getProgramBus: vi.fn(() => ({})),
       getAudioContext: vi.fn(() => ({ decodeAudioData: vi.fn() })),
     }));
     vi.doMock('../../audio/ducking', () => ({
@@ -667,6 +673,7 @@ describe('ControlChannel message handling', () => {
     vi.doMock('../../audio/context', () => ({
       __esModule: true,
       getMasterGain: vi.fn(() => ({})),
+      getProgramBus: vi.fn(() => ({})),
       getAudioContext: vi.fn(() => ({ decodeAudioData: vi.fn() })),
     }));
     vi.doMock('../../audio/ducking', () => ({
@@ -709,6 +716,7 @@ describe('ControlChannel message handling', () => {
     vi.doMock('../../audio/context', () => ({
       __esModule: true,
       getMasterGain: vi.fn(() => ({})),
+      getProgramBus: vi.fn(() => ({})),
       getAudioContext: vi.fn(() => ({ decodeAudioData: vi.fn() })),
     }));
     vi.doMock('../../audio/ducking', () => ({
