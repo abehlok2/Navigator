@@ -7,6 +7,7 @@ import AssetAvailability from '../features/ui/AssetAvailability';
 import FacilitatorControls from '../features/ui/FacilitatorControls';
 import RecordingControls from '../features/ui/RecordingControls';
 import TelemetryDisplay from '../features/ui/TelemetryDisplay';
+import ParticipantGrid from '../features/room/components/ParticipantGrid';
 import { useAudioContextUnlock } from '../features/audio/context';
 import { attachRemoteFacilitatorStream, resetRemoteFacilitatorStreams } from '../features/audio/speech';
 import AuthForm from '../features/auth/AuthForm';
@@ -37,7 +38,6 @@ const isRole = (value: string | null): value is Role =>
 
 const formatRole = (value: Role): string => value.charAt(0).toUpperCase() + value.slice(1);
 
-const ROLE_OPTIONS: Role[] = ['facilitator', 'explorer', 'listener'];
 type ModerationNotice = { type: 'success' | 'error'; message: string };
 type PendingModeration = { id: string; type: 'role' | 'remove' };
 
@@ -380,6 +380,16 @@ export default function SessionPage() {
     };
   }, [cleanupRemoteAudio]);
 
+  const handleParticipantCardSelect = useCallback(
+    (id: string) => {
+      if (!availableTargets.some(target => target.id === id)) {
+        return;
+      }
+      setTargetId(id);
+    },
+    [availableTargets]
+  );
+
   if (!token) {
     return <AuthForm />;
   }
@@ -509,79 +519,17 @@ export default function SessionPage() {
                       )}
                     </div>
                   )}
-                  {participants.length > 0 ? (
-                    <ul className="space-y-4">
-                      {participants.map(participant => {
-                        const isSelfParticipant = participantId === participant.id;
-                        const isPending = pendingModeration?.id === participant.id;
-                        const isRemoving = isPending && pendingModeration?.type === 'remove';
-                        const isUpdatingRole = isPending && pendingModeration?.type === 'role';
-                        const selectId = `participant-${participant.id}-role`;
-                        return (
-                          <li
-                            key={participant.id}
-                            className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm"
-                          >
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                              <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
-                                <Badge variant="info">{formatRole(participant.role)}</Badge>
-                                <span className="font-mono text-xs text-slate-500">{participant.id}</span>
-                                {isSelfParticipant && <Badge variant="muted">You</Badge>}
-                              </div>
-                              <Badge variant={participant.connected ? 'success' : 'muted'}>
-                                {participant.connected ? 'Connected' : 'Offline'}
-                              </Badge>
-                            </div>
-                            {canModerateParticipants && (
-                              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-                                  <Label htmlFor={selectId}>Role</Label>
-                                  <div className="relative w-full sm:w-[200px]">
-                                    <Select
-                                      id={selectId}
-                                      value={participant.role}
-                                      onChange={e => {
-                                        const nextRole = e.target.value as Role;
-                                        if (nextRole !== participant.role && !isSelfParticipant) {
-                                          handleParticipantRoleChange(participant.id, nextRole);
-                                        }
-                                      }}
-                                      disabled={isPending || isSelfParticipant}
-                                    >
-                                      {ROLE_OPTIONS.map(option => (
-                                        <option key={option} value={option}>
-                                          {formatRole(option)}
-                                        </option>
-                                      ))}
-                                    </Select>
-                                    <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                  </div>
-                                </div>
-                                <div className="flex flex-wrap items-center gap-3">
-                                  <Button
-                                    type="button"
-                                    onClick={() => handleRemoveParticipant(participant.id)}
-                                    disabled={isPending || isSelfParticipant}
-                                    className="h-9 bg-rose-500 px-3 text-xs font-semibold text-white hover:bg-rose-600 disabled:bg-rose-300/70"
-                                  >
-                                    {isRemoving ? 'Removing…' : 'Remove'}
-                                  </Button>
-                                  {isUpdatingRole && <span className="text-xs text-slate-500">Updating role…</span>}
-                                  {isSelfParticipant && (
-                                    <span className="text-xs text-slate-500">You cannot modify your own entry.</span>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  ) : (
-                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-6 text-sm text-slate-500">
-                      No participants in this room yet.
-                    </div>
-                  )}
+                  <ParticipantGrid
+                    participants={participants}
+                    currentParticipantId={participantId ?? undefined}
+                    selectedParticipantId={targetId || undefined}
+                    selectableParticipantIds={availableTargets.map(participant => participant.id)}
+                    onSelectParticipant={handleParticipantCardSelect}
+                    canModerate={canModerateParticipants}
+                    onChangeRole={handleParticipantRoleChange}
+                    onRemoveParticipant={handleRemoveParticipant}
+                    pendingModeration={pendingModeration}
+                  />
                 </CardContent>
               </Card>
             )}
