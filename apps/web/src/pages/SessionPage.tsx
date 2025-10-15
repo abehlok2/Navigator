@@ -30,7 +30,7 @@ import {
   type ParticipantSummary,
   type Role,
 } from '../features/session/api';
-import ListenerPanel from '../features/ui/ListenerPanel';
+import ListenerView from '../features/session/views/ListenerView';
 import RoomJoiner from '../features/room/components/RoomJoiner';
 
 const isRole = (value: string | null): value is Role =>
@@ -448,7 +448,14 @@ export default function SessionPage() {
             )}
             {isFacilitatorSession && <FacilitatorControls />}
             {isExplorerSession && <RecordingControls />}
-            {isListenerSession && <ListenerPanel />}
+            {isListenerSession && (
+              <ListenerView
+                participants={participants}
+                participantId={participantId}
+                facilitatorId={targetId || null}
+                username={username}
+              />
+            )}
             {!isListenerSession && <TelemetryDashboard />}
           </section>
           <section className="space-y-8">
