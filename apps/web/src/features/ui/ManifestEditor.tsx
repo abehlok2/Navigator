@@ -37,7 +37,13 @@ import {
 } from 'lucide-react';
 
 import { Button } from '../../components/ui/button';
-import { GlassCard, GlassCardContent, GlassCardHeader, GlassCardTitle } from '../../components/ui/glass-card';
+import {
+  GlassCard,
+  GlassCardContent,
+  GlassCardDescription,
+  GlassCardHeader,
+  GlassCardTitle,
+} from '../../components/ui/glass-card';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { useSessionStore } from '../../state/session';
@@ -562,10 +568,14 @@ const AddAssetModal: React.FC<{
           >
             <GlassCard variant="elevated" glowColor="blue" className="overflow-hidden">
               <GlassCardHeader className="border-b border-white/10 pb-4">
-                <GlassCardTitle className="text-2xl text-white">Add assets</GlassCardTitle>
-                <p className="text-sm text-slate-300">
-                  Upload audio files for automatic metadata or manually create an entry.
-                </p>
+                <Dialog.Title asChild>
+                  <GlassCardTitle className="text-2xl text-white">Add assets</GlassCardTitle>
+                </Dialog.Title>
+                <Dialog.Description asChild>
+                  <GlassCardDescription>
+                    Upload audio files for automatic metadata or manually create an entry.
+                  </GlassCardDescription>
+                </Dialog.Description>
               </GlassCardHeader>
               <GlassCardContent className="gap-6">
                 <div className="flex flex-col gap-3 rounded-xl border border-dashed border-white/15 bg-white/5 p-6 text-center">
@@ -694,10 +704,14 @@ const ConfirmationDialog: React.FC<{
         >
           <GlassCard variant="elevated" glowColor="purple">
             <GlassCardHeader className="border-b border-white/10 pb-4">
-              <GlassCardTitle className="text-2xl text-white">Send manifest?</GlassCardTitle>
-              <p className="text-sm text-slate-300">
-                This will broadcast the updated manifest to everyone connected. Are you sure you want to continue?
-              </p>
+              <Dialog.Title asChild>
+                <GlassCardTitle className="text-2xl text-white">Send manifest?</GlassCardTitle>
+              </Dialog.Title>
+              <Dialog.Description asChild>
+                <GlassCardDescription>
+                  This will broadcast the updated manifest to everyone connected. Are you sure you want to continue?
+                </GlassCardDescription>
+              </Dialog.Description>
             </GlassCardHeader>
             <GlassCardContent>
               <div className="flex flex-col gap-4 text-sm text-slate-200">

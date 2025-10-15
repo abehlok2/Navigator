@@ -881,10 +881,14 @@ export default function DashboardPage() {
               <GlassCard variant="elevated" glowColor="purple" className="border-white/10 bg-white/[0.06]">
                 <GlassCardHeader className="flex flex-col gap-2 border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <GlassCardTitle className="text-2xl text-white">Create a mission room</GlassCardTitle>
-                    <GlassCardDescription className="text-slate-200/80">
-                      Configure room presets, optional passwords, and participation rules before launching.
-                    </GlassCardDescription>
+                    <Dialog.Title asChild>
+                      <GlassCardTitle className="text-2xl text-white">Create a mission room</GlassCardTitle>
+                    </Dialog.Title>
+                    <Dialog.Description asChild>
+                      <GlassCardDescription className="text-slate-200/80">
+                        Configure room presets, optional passwords, and participation rules before launching.
+                      </GlassCardDescription>
+                    </Dialog.Description>
                   </div>
                   <Dialog.Close asChild>
                     <button
@@ -1053,6 +1057,10 @@ export default function DashboardPage() {
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/75 backdrop-blur" />
           <Dialog.Content className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <Dialog.Title className="sr-only">Join a mission room</Dialog.Title>
+            <Dialog.Description className="sr-only">
+              Step through the room setup to connect with the right participant.
+            </Dialog.Description>
             <motion.div
               initial={{ opacity: 0, scale: 0.94 }}
               animate={{ opacity: 1, scale: 1 }}
