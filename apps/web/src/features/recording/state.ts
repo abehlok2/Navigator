@@ -11,6 +11,8 @@ export interface RecordingItem {
   filename: string;
   notes?: string;
   tags: string[];
+  sampleRate?: number;
+  bitrate?: number;
 }
 
 interface RecordingLibraryState {

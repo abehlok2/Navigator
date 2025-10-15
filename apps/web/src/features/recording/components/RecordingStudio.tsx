@@ -29,19 +29,8 @@ import {
   type RecordingWaveform,
 } from '../../audio/recorder';
 import { getAudioContext } from '../../audio/context';
+import { useRecordingLibraryStore, type RecordingItem } from '../state';
 import Waveform from './Waveform';
-
-interface RecordingItem {
-  id: string;
-  url: string;
-  createdAt: number;
-  size: number;
-  durationSec: number;
-  mimeType: string;
-  filename: string;
-  bitrate?: number;
-  sampleRate: number;
-}
 
 type StudioState = 'idle' | 'recording' | 'paused';
 
@@ -113,6 +102,13 @@ const describeMime = (mime: string) => {
   return mime.toUpperCase();
 };
 
+const describeSampleRate = (rate?: number) => {
+  if (typeof rate !== 'number' || !Number.isFinite(rate) || rate <= 0) {
+    return 'Sample rate unknown';
+  }
+  return `${(rate / 1000).toFixed(1)} kHz`;
+};
+
 const triggerDownload = (item: RecordingItem) => {
   const link = document.createElement('a');
   link.href = item.url;
@@ -144,14 +140,15 @@ const RecordingStudio: React.FC = () => {
   const [bitrate, setBitrate] = useState<string>('256000');
   const [activeFormat, setActiveFormat] = useState('audio/webm');
   const [sampleRate, setSampleRate] = useState<number>(48000);
-  const [recordings, setRecordings] = useState<RecordingItem[]>([]);
+  const recordings = useRecordingLibraryStore(state => state.recordings);
+  const addRecordingToLibrary = useRecordingLibraryStore(state => state.addRecording);
+  const removeRecordingFromLibrary = useRecordingLibraryStore(state => state.removeRecording);
   const [outputLevels, setOutputLevels] = useState<RecordingLevels>({ left: MIN_DB, right: MIN_DB });
   const [inputLevels, setInputLevels] = useState<RecordingLevels>({ left: MIN_DB, right: MIN_DB });
   const [waveform, setWaveform] = useState<RecordingWaveform | null>(null);
   const [autoSaveTake, setAutoSaveTake] = useState<RecordingItem | null>(null);
 
   const handleRef = useRef<RecordingHandle | null>(null);
-  const urlsRef = useRef<string[]>([]);
   const meterRafRef = useRef<number | null>(null);
   const timerRef = useRef<number | null>(null);
   const pauseStartedAtRef = useRef<number | null>(null);
@@ -305,28 +302,30 @@ const RecordingStudio: React.FC = () => {
       }
       const createdAt = Date.now();
       const url = URL.createObjectURL(blob);
-      urlsRef.current.push(url);
       const totalPaused =
         accumulatedPauseRef.current +
         (pauseStartedAtRef.current ? Date.now() - pauseStartedAtRef.current : 0);
       const durationSec = Math.max(0, (createdAt - handle.startedAt - totalPaused) / 1000);
-      const filename = createFilename(createdAt, blob.type || handle.mimeType);
+      const mimeType = blob.type || handle.mimeType || 'audio/webm';
+      const filename = createFilename(createdAt, mimeType);
       const item: RecordingItem = {
         id: `session-mix-${createdAt}`,
         url,
         createdAt,
         size: blob.size,
         durationSec,
-        mimeType: blob.type || handle.mimeType,
+        mimeType,
         filename,
         bitrate: handle.bitrate,
         sampleRate: handle.sampleRate,
+        channels: 2,
+        tags: [],
       };
-      setRecordings(prev => [item, ...prev]);
+      addRecordingToLibrary(item);
       setAutoSaveTake(item);
       setActiveFormat(item.mimeType);
     },
-    []
+    [addRecordingToLibrary]
   );
 
   const stopRecording = useCallback(async () => {
@@ -340,17 +339,13 @@ const RecordingStudio: React.FC = () => {
     resetTimers();
   }, [finalizeRecording, resetTimers, stopOutputMonitoring, stopTimer, stopWaveformMonitoring]);
 
-  const removeRecording = useCallback((id: string) => {
-    setRecordings(prev => {
-      const next = prev.filter(item => item.id !== id);
-      const removed = prev.find(item => item.id === id);
-      if (removed) {
-        URL.revokeObjectURL(removed.url);
-        urlsRef.current = urlsRef.current.filter(url => url !== removed.url);
-      }
-      return next;
-    });
-  }, []);
+  const removeRecording = useCallback(
+    (id: string) => {
+      removeRecordingFromLibrary(id);
+      setAutoSaveTake(current => (current?.id === id ? null : current));
+    },
+    [removeRecordingFromLibrary]
+  );
 
   useEffect(() => {
     if (!canRecord && handleRef.current) {
@@ -407,8 +402,6 @@ const RecordingStudio: React.FC = () => {
       stopOutputMonitoring();
       stopWaveformMonitoring();
       stopTimer();
-      urlsRef.current.forEach(url => URL.revokeObjectURL(url));
-      urlsRef.current = [];
     };
   }, [stopOutputMonitoring, stopTimer, stopWaveformMonitoring]);
 
@@ -631,7 +624,7 @@ const RecordingStudio: React.FC = () => {
                         <div className="text-sm font-semibold text-white">{formatTimestamp(item.createdAt)}</div>
                         <div className="text-xs text-slate-300">
                           {formatDuration(item.durationSec)} • {formatBytes(item.size)} • {describeMime(item.mimeType)} •{' '}
-                          {(item.sampleRate / 1000).toFixed(1)} kHz
+                          {describeSampleRate(item.sampleRate)}
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-3">
@@ -701,7 +694,7 @@ const RecordingStudio: React.FC = () => {
               <h3 className="text-lg font-semibold text-white">Save your latest mix?</h3>
               <p className="mt-2 text-sm text-slate-300">
                 We captured <strong>{formatDuration(autoSaveTake.durationSec)}</strong> of mix audio ({' '}
-                {describeMime(autoSaveTake.mimeType)}) at {(autoSaveTake.sampleRate / 1000).toFixed(1)} kHz.
+                {describeMime(autoSaveTake.mimeType)}) at {describeSampleRate(autoSaveTake.sampleRate)}.
               </p>
               <p className="mt-1 text-xs uppercase tracking-[0.25em] text-slate-500">
                 {formatBytes(autoSaveTake.size)}
