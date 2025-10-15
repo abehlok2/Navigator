@@ -155,14 +155,6 @@ export default function FacilitatorControls() {
     [control, updateStatus]
   );
 
-  const handleCrossfade = () => {
-    const loaded = manifestEntries.filter(entry => remoteAssetSet.has(entry.id)).map(entry => entry.id);
-    if (loaded.length >= 2) {
-      control?.crossfade({ fromId: loaded[0], toId: loaded[1], duration: 2 }).catch(() => {});
-    }
-  };
-
-
   const inlineButtonClass =
     'rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40';
 

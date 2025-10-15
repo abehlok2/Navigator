@@ -92,11 +92,11 @@ export function VUMeter({
   );
 }
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef } from 'react';
 
-type Orientation = "vertical" | "horizontal";
+type Orientation = 'vertical' | 'horizontal';
 
-export interface VUMeterProps {
+export interface CanvasVUMeterProps {
   /** Current RMS or averaged level in decibels. */
   level: number;
   /** Peak level in decibels. */
@@ -124,13 +124,13 @@ const dbToUnit = (db: number) => {
   return (clamped - MIN_DB) / (MAX_DB - MIN_DB);
 };
 
-const VUMeter = ({
+const CanvasVUMeter = ({
   level,
   peak,
   channel = "",
   orientation = "vertical",
   ariaLabel,
-}: VUMeterProps) => {
+}: CanvasVUMeterProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animationFrameRef = useRef<number>();
   const devicePixelRatioRef = useRef(1);
@@ -406,4 +406,4 @@ function roundRect(
   context.closePath();
 }
 
-export default VUMeter;
+export default CanvasVUMeter;
