@@ -94,17 +94,20 @@ export default function RecordingControls() {
     const createdAt = Date.now();
     const url = URL.createObjectURL(blob);
     const durationSec = Math.max(0, (createdAt - startedAt) / 1000);
-    const filename = createFilename(createdAt, blob.type);
+    const mimeType = blob.type || handle.mimeType || 'audio/webm';
+    const filename = createFilename(createdAt, mimeType);
     const item: RecordingItem = {
       id: `session-mix-${createdAt}`,
       url,
       createdAt,
       size: blob.size,
       durationSec,
-      mimeType: blob.type || 'audio/webm',
+      mimeType,
       channels: 2,
       filename,
       tags: [],
+      sampleRate: handle.sampleRate,
+      bitrate: handle.bitrate,
     };
     addRecording(item);
   }, [addRecording, stopMetering]);
