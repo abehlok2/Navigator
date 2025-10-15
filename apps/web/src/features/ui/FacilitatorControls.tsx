@@ -11,6 +11,7 @@ import { useSessionStore } from '../../state/session';
 import { getRawAssetById } from '../audio/assets';
 import DuckingEditor from '../audio/components/DuckingEditor';
 import ManifestEditor from './ManifestEditor';
+import FacilitatorMixerPanel from '../audio/components/FacilitatorMixerPanel';
 
 type EntryStatusPhase = 'idle' | 'loading' | 'unloading' | 'success' | 'error';
 
@@ -31,14 +32,6 @@ export default function FacilitatorControls() {
   const remoteAssetSet = remoteAssets;
   const remoteMissingSet = remoteMissing;
   const [status, setStatus] = useState<Record<string, EntryStatus>>({});
-
-  const [gain, setGain] = useState<Record<string, number>>({});
-  const handlePlay = (id: string) => control?.play({ id }).catch(() => {});
-  const handleStop = (id: string) => control?.stop({ id }).catch(() => {});
-  const handleGain = (id: string, value: number) => {
-    setGain(g => ({ ...g, [id]: value }));
-    control?.setGain({ id, gainDb: value }).catch(() => {});
-  };
 
   useEffect(() => {
     setStatus(prev => {
@@ -84,6 +77,13 @@ export default function FacilitatorControls() {
   const updateStatus = useCallback((id: string, next: EntryStatus) => {
     setStatus(prev => ({ ...prev, [id]: next }));
   }, []);
+
+  const handleCrossfade = useCallback(() => {
+    const loaded = manifestEntries.filter(entry => remoteAssetSet.has(entry.id)).map(entry => entry.id);
+    if (loaded.length >= 2) {
+      control?.crossfade({ fromId: loaded[0], toId: loaded[1], duration: 2 }).catch(() => {});
+    }
+  }, [control, manifestEntries, remoteAssetSet]);
 
   const toDataUrl = useCallback((data: ArrayBuffer, mimeType?: string) => {
     const bytes = new Uint8Array(data);
@@ -236,46 +236,13 @@ export default function FacilitatorControls() {
                   </div>
                 </div>
                 {entryStatus?.message && <div className={statusTone(entryStatus.phase)}>{entryStatus.message}</div>}
-                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
-                    <button
-                      type="button"
-                      onClick={() => handlePlay(id)}
-                      disabled={!remoteAssetSet.has(id) || !control}
-                      className={inlineButtonClass}
-                    >
-                      Play
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleStop(id)}
-                      disabled={!remoteAssetSet.has(id) || !control}
-                      className={inlineButtonClass}
-                    >
-                      Stop
-                    </button>
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
-                      Remote {remoteAssetSet.has(id) ? 'ready' : 'pending'}
-                    </span>
-                  </div>
-                  <label className="flex w-full flex-col gap-2 text-xs text-slate-500 sm:max-w-md">
-                    <span className="font-semibold uppercase tracking-wide text-slate-400">Gain</span>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="range"
-                        min={-60}
-                        max={6}
-                        step={1}
-                        value={gain[id] ?? 0}
-                        onChange={e => handleGain(id, Number(e.target.value))}
-                        disabled={!remoteAssetSet.has(id) || !control}
-                        className="h-1.5 flex-1 appearance-none rounded-full bg-slate-200 accent-blue-600 disabled:opacity-50"
-                      />
-                      <span className="w-16 text-right text-xs font-semibold text-slate-600">
-                        {(gain[id] ?? 0).toFixed(0)} dB
-                      </span>
-                    </div>
-                  </label>
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
+                    Remote {remoteAssetSet.has(id) ? 'ready' : 'pending'}
+                  </span>
+                  <span className="rounded-full bg-indigo-100 px-3 py-1 text-[11px] font-semibold text-indigo-700">
+                    Use mixer panel for transport &amp; gain
+                  </span>
                 </div>
               </li>
             );
@@ -299,6 +266,7 @@ export default function FacilitatorControls() {
           </div>
         )}
         <DuckingEditor control={control} />
+        <FacilitatorMixerPanel />
       </CardContent>
     </Card>
   );
