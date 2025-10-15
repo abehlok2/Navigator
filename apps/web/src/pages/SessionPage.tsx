@@ -6,7 +6,7 @@ import AssetDropZone from '../features/ui/AssetDropZone';
 import AssetLibrary from '../features/assets/components/AssetLibrary';
 import FacilitatorControls from '../features/ui/FacilitatorControls';
 import RecordingControls from '../features/ui/RecordingControls';
-import TelemetryDisplay from '../features/ui/TelemetryDisplay';
+import TelemetryDashboard from '../features/telemetry/components/TelemetryDashboard';
 import ParticipantGrid from '../features/room/components/ParticipantGrid';
 import { useAudioContextUnlock } from '../features/audio/context';
 import { attachRemoteFacilitatorStream, resetRemoteFacilitatorStreams } from '../features/audio/speech';
@@ -449,7 +449,7 @@ export default function SessionPage() {
             {isFacilitatorSession && <FacilitatorControls />}
             {isExplorerSession && <RecordingControls />}
             {isListenerSession && <ListenerPanel />}
-            {!isListenerSession && <TelemetryDisplay />}
+            {!isListenerSession && <TelemetryDashboard />}
           </section>
           <section className="space-y-8">
             <RoomJoiner
