@@ -9,6 +9,7 @@ import {
 } from '../../components/ui/card';
 import { useSessionStore } from '../../state/session';
 import { getRawAssetById } from '../audio/assets';
+import DuckingEditor from '../audio/components/DuckingEditor';
 import ManifestEditor from './ManifestEditor';
 import FacilitatorMixerPanel from '../audio/components/FacilitatorMixerPanel';
 
@@ -154,6 +155,14 @@ export default function FacilitatorControls() {
     [control, updateStatus]
   );
 
+  const handleCrossfade = () => {
+    const loaded = manifestEntries.filter(entry => remoteAssetSet.has(entry.id)).map(entry => entry.id);
+    if (loaded.length >= 2) {
+      control?.crossfade({ fromId: loaded[0], toId: loaded[1], duration: 2 }).catch(() => {});
+    }
+  };
+
+
   const inlineButtonClass =
     'rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40';
 
@@ -256,6 +265,7 @@ export default function FacilitatorControls() {
             </Button>
           </div>
         )}
+        <DuckingEditor control={control} />
         <FacilitatorMixerPanel />
       </CardContent>
     </Card>
