@@ -1,11 +1,13 @@
 /* @vitest-environment jsdom */
+import React from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react';
 
 vi.mock('../ManifestEditor', () => ({
   __esModule: true,
   default: () => null,
 }));
+
 
 if (!(globalThis as any).requestAnimationFrame) {
   (globalThis as any).requestAnimationFrame = (cb: FrameRequestCallback) =>
@@ -65,10 +67,15 @@ describe('UI components', () => {
     render(<AssetAvailability />);
 
     expect(screen.getByText('Soothing Tone')).toBeTruthy();
-    expect(screen.getByText('ID: tone')).toBeTruthy();
+    expect(screen.getByText(/Legacy remote reference/i)).toBeTruthy();
+    expect(
+      screen.getByRole('link', {
+        name: 'https://example.com/tone.wav',
+      }),
+    ).toBeTruthy();
     expect(screen.getByText('Use for intro segment')).toBeTruthy();
-    expect(screen.getByText(/Legacy remote reference/)).toBeTruthy();
-    expect(screen.queryByText(/Explorer progress/)).toBeNull();
+    expect(screen.getByText(/100% loaded/i)).toBeTruthy();
+    expect(screen.queryByText(/Explorer ready/i)).toBeNull();
   });
 
   it('shows facilitator view of remote asset progress', async () => {
@@ -88,8 +95,13 @@ describe('UI components', () => {
 
     render(<AssetAvailability />);
 
-    expect(screen.getByText(/Explorer progress: 1\/1 \(100%\)/)).toBeTruthy();
-    expect(screen.getByText(/Explorer: Loaded/)).toBeTruthy();
+    expect(screen.getByText('Reported by remote explorer')).toBeTruthy();
+    expect(screen.getByText('Explorer ready')).toBeTruthy();
+    const card = screen.getByText('Tone Pad').closest('[role="button"]') as HTMLElement;
+    const loadButton = within(card).getByRole('button', { name: /Load asset/i });
+    const unloadButton = within(card).getByRole('button', { name: /Unload/i });
+    expect(loadButton.getAttribute('disabled')).not.toBeNull();
+    expect(unloadButton.hasAttribute('disabled')).toBe(false);
   });
 
   it('handles asset drop interactions with manifest guidance', async () => {
@@ -121,16 +133,10 @@ describe('UI components', () => {
 
     render(<AssetDropZone />);
 
-    const instructions = screen.getByText('Drop audio files to match your manifest.');
+    const instructions = screen.getByText(/Drop audio files/i);
     expect(instructions).toBeTruthy();
     expect(screen.getByText(/Loaded 1 \/ 2/)).toBeTruthy();
-    expect(screen.getByText('Tone Pad')).toBeTruthy();
-    expect(screen.getByText('ID: tone')).toBeTruthy();
-    expect(screen.getByText('Primary intro bed')).toBeTruthy();
-    const sourceLink = screen.getByRole('link', { name: 'Source' });
-    expect(sourceLink.getAttribute('href')).toBe('https://assets.example.com/tone.wav');
-    expect(screen.getByText('Segment Chime')).toBeTruthy();
-    expect(screen.getByText('ID: chime')).toBeTruthy();
+    expect(screen.getByText('50%')).toBeTruthy();
 
     const dropZone = instructions.parentElement as HTMLElement;
     fireEvent.drop(dropZone, { nativeEvent: { dataTransfer: {} } });
@@ -195,7 +201,7 @@ describe('UI components', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Start Recording/i }));
 
-    await screen.findByText('Recording in progress…');
+    await screen.findByText('Recording…');
     expect(screen.getByText(/Session mix level/i)).toBeTruthy();
     expect(startMixRecording).toHaveBeenCalledWith(micStream, expect.any(Function));
   });

@@ -1,11 +1,14 @@
-export { colors } from "./colors";
-export type { ColorTokens } from "./colors";
-export { typography } from "./typography";
-export type { TypographyTokens } from "./typography";
-export { spacing } from "./spacing";
-export type { SpacingTokens } from "./spacing";
-export { animations } from "./animations";
-export type { AnimationTokens } from "./animations";
+import { colors } from "./colors";
+import type { ColorTokens } from "./colors";
+import { typography } from "./typography";
+import type { TypographyTokens } from "./typography";
+import { spacing } from "./spacing";
+import type { SpacingTokens } from "./spacing";
+import { animations } from "./animations";
+import type { AnimationTokens } from "./animations";
+
+export { colors, typography, spacing, animations };
+export type { ColorTokens, TypographyTokens, SpacingTokens, AnimationTokens };
 
 /**
  * Aggregated theme object combining all token categories.
