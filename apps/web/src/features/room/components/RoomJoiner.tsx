@@ -37,7 +37,7 @@ export interface RoomJoinerProps {
   onRoomIdChange: (value: string) => void;
   canCreateRoom: boolean;
   creatingRoom: boolean;
-  onCreateRoom: () => Promise<void> | void;
+  onCreateRoom: () => Promise<boolean> | boolean;
   joinPassword: string;
   onJoinPasswordChange: (value: string) => void;
   participants: ParticipantSummary[];
@@ -166,8 +166,10 @@ export default function RoomJoiner({
 
   const handleCreateRoom = async () => {
     setStepMessage(null);
-    await onCreateRoom();
-    setStep('password');
+    const created = await onCreateRoom();
+    if (created) {
+      setStep('password');
+    }
   };
 
   const handleRefreshClick = async () => {

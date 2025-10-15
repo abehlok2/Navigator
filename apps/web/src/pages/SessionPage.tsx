@@ -264,15 +264,20 @@ export default function SessionPage() {
   }, []);
 
   const handleCreateRoom = useCallback(async () => {
-    if (!token) return;
+    if (!token) {
+      setError('Authentication token is missing');
+      return false;
+    }
     setCreatingRoom(true);
     setError(null);
     try {
       const id = await createRoom(token);
       setRoomId(id);
+      return true;
     } catch (err) {
       console.error(err);
       setError('Failed to create room');
+      return false;
     } finally {
       setCreatingRoom(false);
     }
