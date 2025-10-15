@@ -51,11 +51,49 @@ const describePan = (value: number) => {
   return value < 0 ? `L${amount}` : `R${amount}`;
 };
 
+const STATUS_THEME: Record<
+  'ready' | 'pending' | 'missing',
+  { badge: string; dot: string; label: string }
+> = {
+  ready: {
+    badge: 'bg-emerald-500/15 text-emerald-200',
+    dot: 'bg-emerald-400',
+    label: 'Ready',
+  },
+  pending: {
+    badge: 'bg-amber-500/15 text-amber-200',
+    dot: 'bg-amber-300',
+    label: 'Pending',
+  },
+  missing: {
+    badge: 'bg-rose-500/15 text-rose-200',
+    dot: 'bg-rose-400',
+    label: 'Missing',
+  },
+};
+
+const formatBytes = (bytes?: number) => {
+  if (!Number.isFinite(bytes) || bytes === undefined) return null;
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  const mb = kb / 1024;
+  if (mb < 1024) return `${mb.toFixed(1)} MB`;
+  const gb = mb / 1024;
+  return `${gb.toFixed(1)} GB`;
+};
+
 export interface MixerChannelProps {
   /** Asset identifier used when calling the scheduler helpers. */
   assetId: string;
   /** Optional friendly name shown at the top of the strip. */
   assetName?: string;
+  /** Optional descriptive notes to show alongside the asset metadata. */
+  notes?: string;
+  /** Approximate size of the asset in bytes. */
+  bytes?: number;
+  /** Override of the asset status indicator. */
+  status?: 'missing' | 'ready' | 'pending';
   /** Current gain value in dB. When omitted the component manages its own state. */
   gainDb?: number;
   /** Initial gain in dB used when the component is uncontrolled. */
@@ -90,11 +128,16 @@ export interface MixerChannelProps {
   onPanChange?: (pan: number) => void;
   /** Additional class name passed to the underlying GlassCard. */
   className?: string;
+  /** Disables all interactive controls when true. */
+  disabled?: boolean;
 }
 
 export function MixerChannel({
   assetId,
   assetName,
+  notes,
+  bytes,
+  status,
   gainDb: gainDbProp,
   initialGainDb = 0,
   meterRmsDb,
@@ -112,6 +155,7 @@ export function MixerChannel({
   onStop,
   onPanChange,
   className,
+  disabled = false,
 }: MixerChannelProps) {
   const manifestEntry = useSessionStore(useCallback(state => state.manifest[assetId], [assetId]));
   const peerClock = useSessionStore(state => state.peerClock);
@@ -159,6 +203,9 @@ export function MixerChannel({
   const playing = isPlayingProp !== undefined ? isPlayingProp : internalPlaying;
   const pan = panProp !== undefined ? clampPan(panProp) : internalPan;
   const active = isActiveProp ?? playing;
+  const resolvedStatus = status ?? (assetLoaded ? 'ready' : 'pending');
+  const statusTheme = STATUS_THEME[resolvedStatus];
+  const controlsDisabled = disabled || resolvedStatus !== 'ready' || !assetLoaded;
 
   useEffect(() => {
     const targetGain = muted ? SILENCE_GAIN_DB : gainDb;
@@ -167,33 +214,36 @@ export function MixerChannel({
 
   const handleGainChange = useCallback(
     (value: number[]) => {
+      if (controlsDisabled) return;
       const next = clampGain(value[0] ?? gainDb);
       if (gainDbProp === undefined) {
         setInternalGain(next);
       }
       onGainChange?.(next);
     },
-    [gainDb, gainDbProp, onGainChange]
+    [controlsDisabled, gainDb, gainDbProp, onGainChange]
   );
 
   const handleMuteToggle = useCallback(() => {
+    if (controlsDisabled) return;
     const next = !muted;
     if (isMutedProp === undefined) {
       setInternalMuted(next);
     }
     onMuteChange?.(next);
-  }, [isMutedProp, muted, onMuteChange]);
+  }, [controlsDisabled, isMutedProp, muted, onMuteChange]);
 
   const handleSoloToggle = useCallback(() => {
+    if (controlsDisabled) return;
     const next = !solo;
     if (isSoloProp === undefined) {
       setInternalSolo(next);
     }
     onSoloChange?.(next);
-  }, [isSoloProp, solo, onSoloChange]);
+  }, [controlsDisabled, isSoloProp, solo, onSoloChange]);
 
   const handlePlay = useCallback(() => {
-    if (!assetLoaded) return;
+    if (controlsDisabled || !assetLoaded) return;
     if (!peerClock) {
       console.warn('MixerChannel: cannot start playback without a peer clock.');
       return;
@@ -207,33 +257,36 @@ export function MixerChannel({
     } catch (error) {
       console.error('MixerChannel: failed to start playback', error);
     }
-  }, [assetId, assetLoaded, gainDb, isPlayingProp, muted, onPlay, peerClock]);
+  }, [assetId, assetLoaded, controlsDisabled, gainDb, isPlayingProp, muted, onPlay, peerClock]);
 
   const handleStop = useCallback(() => {
+    if (controlsDisabled) return;
     stop(assetId);
     if (isPlayingProp === undefined) {
       setInternalPlaying(false);
     }
     onStop?.();
-  }, [assetId, isPlayingProp, onStop]);
+  }, [assetId, controlsDisabled, isPlayingProp, onStop]);
 
   const handlePanChange = useCallback(
     (value: number[]) => {
+      if (controlsDisabled) return;
       const next = clampPan(value[0] ?? pan);
       if (panProp === undefined) {
         setInternalPan(next);
       }
       onPanChange?.(next);
     },
-    [onPanChange, pan, panProp]
+    [controlsDisabled, onPanChange, pan, panProp]
   );
 
   const handlePanReset = useCallback(() => {
+    if (controlsDisabled) return;
     if (panProp === undefined) {
       setInternalPan(0);
     }
     onPanChange?.(0);
-  }, [onPanChange, panProp]);
+  }, [controlsDisabled, onPanChange, panProp]);
 
   const channelName = useMemo(() => {
     if (assetName) return assetName;
@@ -243,6 +296,7 @@ export function MixerChannel({
 
   const displayGain = formatDb(gainDb, muted);
   const panLabel = describePan(pan);
+  const bytesLabel = formatBytes(bytes);
 
   const glowColor: GlassCardGlowColor = solo ? 'green' : active ? 'blue' : 'purple';
 
@@ -281,15 +335,21 @@ export function MixerChannel({
         <div
           className={cn(
             'flex items-center gap-1 rounded-full px-2 py-1 text-[0.65rem] uppercase tracking-[0.25em]',
-            assetLoaded
-              ? 'bg-emerald-500/15 text-emerald-200'
-              : 'bg-amber-500/15 text-amber-200'
+            statusTheme.badge,
           )}
         >
-          <span className={cn('h-1.5 w-1.5 rounded-full', assetLoaded ? 'bg-emerald-400' : 'bg-amber-300')} />
-          {assetLoaded ? 'Ready' : 'Pending'}
+          <span className={cn('h-1.5 w-1.5 rounded-full', statusTheme.dot)} />
+          {statusTheme.label}
         </div>
       </div>
+      {(notes || bytesLabel) && (
+        <div className="flex flex-col gap-1 text-xs text-slate-400">
+          {notes ? <p className="leading-relaxed">{notes}</p> : null}
+          {bytesLabel ? (
+            <p className="font-mono uppercase tracking-[0.3em] text-slate-500">{bytesLabel}</p>
+          ) : null}
+        </div>
+      )}
 
       <div className="flex flex-col gap-6">
         <div className="flex items-end gap-5">
@@ -318,6 +378,7 @@ export function MixerChannel({
               orientation="vertical"
               onValueChange={handleGainChange}
               className="relative flex h-44 w-12 touch-none select-none flex-col items-center"
+              disabled={controlsDisabled}
             >
               <div className="relative flex h-full w-1.5 flex-1 items-center justify-center">
                 <Slider.Track className="relative h-full w-full overflow-hidden rounded-full bg-slate-800/80">
@@ -347,6 +408,7 @@ export function MixerChannel({
             variant="secondary"
             glass
             onClick={handleMuteToggle}
+            disabled={controlsDisabled}
             className={cn(
               'justify-start gap-2 px-4 py-2 text-xs uppercase tracking-[0.3em]',
               muted
@@ -363,6 +425,7 @@ export function MixerChannel({
             variant="ghost"
             glass
             onClick={handleSoloToggle}
+            disabled={controlsDisabled}
             className={cn(
               'justify-start gap-2 px-4 py-2 text-xs uppercase tracking-[0.3em]',
               solo
@@ -381,7 +444,7 @@ export function MixerChannel({
             size="sm"
             variant="primary"
             glass
-            disabled={!assetLoaded}
+            disabled={controlsDisabled}
             onClick={handlePlay}
             className="gap-2 px-4 py-2 text-xs uppercase tracking-[0.3em]"
           >
@@ -393,7 +456,7 @@ export function MixerChannel({
             size="sm"
             variant="ghost"
             glass
-            disabled={!playing}
+            disabled={controlsDisabled || !playing}
             onClick={handleStop}
             className="gap-2 px-4 py-2 text-xs uppercase tracking-[0.3em]"
           >
@@ -425,6 +488,7 @@ export function MixerChannel({
               orientation="horizontal"
               className="relative flex h-10 w-full select-none items-center"
               onDoubleClick={handlePanReset}
+              disabled={controlsDisabled}
             >
               <Slider.Track className="relative h-1.5 w-full overflow-hidden rounded-full bg-slate-800/80">
                 <Slider.Range className="absolute left-0 top-0 h-full bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-400 shadow-[0_0_18px_rgba(59,130,246,0.35)]" />

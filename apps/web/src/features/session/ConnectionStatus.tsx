@@ -173,7 +173,9 @@ const MetricTile: React.FC<{
   </div>
 );
 
-const QualityTooltip: React.FC<TooltipProps<number, string> & { now: number }> = ({
+type TooltipDatum = { payload?: unknown };
+
+const QualityTooltip: React.FC<{ active?: boolean; payload?: TooltipDatum[]; now: number }> = ({
   active,
   payload,
   now,
@@ -301,14 +303,20 @@ export default function ConnectionStatus() {
   const countdownLabel =
     heartbeatAgeSeconds === null
       ? 'Awaiting first heartbeat.'
-      : countdownSeconds === 0
+      : (countdownSeconds ?? 0) === 0
         ? 'Link will recycle if heartbeat remains idle.'
-        : `Stale in ${countdownSeconds.toFixed(1)}s`;
+        : `Stale in ${(countdownSeconds ?? 0).toFixed(1)}s`;
 
   const statusCopy = STATUS_COPY[connection];
   const gradientId = React.useId();
   const tooltipRenderer = React.useCallback(
-    (props: TooltipProps<number, string>) => <QualityTooltip {...props} now={now} />,
+    (props: TooltipProps<number, string>) => (
+      <QualityTooltip
+        active={props.active}
+        payload={('payload' in props ? props.payload : undefined) as TooltipDatum[] | undefined}
+        now={now}
+      />
+    ),
     [now],
   );
 

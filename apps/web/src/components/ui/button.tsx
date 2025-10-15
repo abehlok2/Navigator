@@ -41,6 +41,8 @@ export interface ButtonProps
   trailingIcon?: React.ReactNode;
   /** Accessible label announced while loading. */
   spinnerLabel?: string;
+  /** Content displayed within the button. */
+  children?: React.ReactNode;
 }
 
 const HEX_PATTERN = /^#(?:[0-9a-fA-F]{3}){1,2}$/;

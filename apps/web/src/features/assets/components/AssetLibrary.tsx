@@ -718,7 +718,7 @@ export default function AssetLibrary() {
                 rowHeight={GRID_CARD_HEIGHT + GRID_GAP}
                 itemData={gridData}
               >
-                {GridCell}
+                {props => <GridCell {...props} />}
               </Grid>
             ) : (
               <List
@@ -728,7 +728,7 @@ export default function AssetLibrary() {
                 itemSize={LIST_CARD_HEIGHT + GRID_GAP}
                 itemData={listData}
               >
-                {ListRow}
+                {props => <ListRow {...props} />}
               </List>
             )}
           </div>

@@ -36,15 +36,15 @@ import {
   Trash2,
 } from 'lucide-react';
 
-import { Button } from '../../../components/ui/button';
-import { GlassCard, GlassCardContent, GlassCardHeader, GlassCardTitle } from '../../../components/ui/glass-card';
-import { Input } from '../../../components/ui/input';
-import { Label } from '../../../components/ui/label';
-import { useSessionStore } from '../../../state/session';
-import { cn } from '../../../lib/utils';
-import { getAudioContext } from '../../audio/context';
-import { registerRawAsset } from '../../audio/assets';
-import type { AssetManifest } from '../../control/protocol';
+import { Button } from '../../components/ui/button';
+import { GlassCard, GlassCardContent, GlassCardHeader, GlassCardTitle } from '../../components/ui/glass-card';
+import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
+import { useSessionStore } from '../../state/session';
+import { cn } from '../../lib/utils';
+import { getAudioContext } from '../audio/context';
+import { registerRawAsset } from '../audio/assets';
+import type { AssetManifest } from '../control/protocol';
 
 interface ManifestDraftEntry {
   key: string;
@@ -64,6 +64,8 @@ type ManifestValidation = {
   globalErrors: string[];
   entryErrors: Record<string, string[]>;
 };
+
+type ManifestEntry = AssetManifest['entries'][number];
 
 interface ManifestDiff {
   added: ManifestDraftEntry[];
@@ -163,7 +165,7 @@ function computeDiff(
 ): ManifestDiff {
   const baselineMap = new Map(baseline.map(entry => [entry.id, entry]));
   const baselineIndex = new Map(baseline.map((entry, index) => [entry.id, index]));
-  const draftManifest = drafts.map(toManifestEntry);
+  const draftManifest: ManifestEntry[] = drafts.map(toManifestEntry);
   const draftMap = new Map(draftManifest.map(entry => [entry.id, entry]));
   const diff: ManifestDiff = { added: [], removed: [], updated: [], reordered: [] };
 
