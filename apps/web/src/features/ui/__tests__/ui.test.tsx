@@ -15,6 +15,73 @@ if (!(globalThis as any).requestAnimationFrame) {
   (globalThis as any).cancelAnimationFrame = (id: number) => clearTimeout(id);
 }
 
+if (!(HTMLCanvasElement.prototype as any).getContext) {
+  HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
+    clearRect: vi.fn(),
+    fillRect: vi.fn(),
+    createLinearGradient: () => ({ addColorStop: vi.fn() }),
+    setTransform: vi.fn(),
+    beginPath: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    stroke: vi.fn(),
+    fill: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+    clip: vi.fn(),
+  })) as any;
+}
+
+if (!(globalThis as any).MediaStream) {
+  (globalThis as any).MediaStream = class {} as any;
+}
+
+if (!(globalThis as any).AudioContext) {
+  class FakeAudioContext {
+    sampleRate = 48000;
+    currentTime = 0;
+    state: AudioContextState = 'running';
+    resume = vi.fn().mockResolvedValue(undefined);
+    close = vi.fn().mockResolvedValue(undefined);
+    createGain() {
+      const node: any = {
+        gain: { value: 1 },
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+      };
+      return node;
+    }
+    createAnalyser() {
+      const analyser: any = {
+        fftSize: 256,
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+        getFloatTimeDomainData: vi.fn((buffer: Float32Array) => buffer.fill(0)),
+      };
+      return analyser;
+    }
+    createChannelSplitter() {
+      return { connect: vi.fn(), disconnect: vi.fn() } as any;
+    }
+    createMediaStreamDestination() {
+      return { stream: new (globalThis as any).MediaStream() } as any;
+    }
+    createMediaStreamSource() {
+      return { connect: vi.fn(), disconnect: vi.fn() } as any;
+    }
+  }
+  (globalThis as any).AudioContext = FakeAudioContext as any;
+  (globalThis as any).webkitAudioContext = FakeAudioContext as any;
+}
+
+if (!(globalThis as any).ResizeObserver) {
+  (globalThis as any).ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as any;
+}
+
 function resetSessionStore(store: any) {
   store.setState({
     role: null,
@@ -139,7 +206,12 @@ describe('UI components', () => {
     expect(screen.getByText('50%')).toBeTruthy();
 
     const dropZone = instructions.parentElement as HTMLElement;
-    fireEvent.drop(dropZone, { nativeEvent: { dataTransfer: {} } });
+    const file = new File(['audio'], 'tone', { type: 'audio/wav' });
+    fireEvent.drop(dropZone, {
+      dataTransfer: {
+        files: [file],
+      },
+    });
 
     expect(handleDropMock).toHaveBeenCalled();
   });
@@ -151,7 +223,14 @@ describe('UI components', () => {
       return {
         startedAt: Date.now(),
         stop: vi.fn().mockResolvedValue(new Blob()),
+        pause: vi.fn(),
+        resume: vi.fn(),
+        isPaused: () => false,
         getLevels: () => ({ left: -120, right: -120 }),
+        getWaveform: () => ({ left: new Float32Array(), right: new Float32Array() }),
+        mimeType: 'audio/webm',
+        sampleRate: 48000,
+        bitrate: 256000,
       };
     });
     vi.doMock('../../audio/recorder', () => ({ startMixRecording }));
@@ -171,7 +250,11 @@ describe('UI components', () => {
 
     expect(confirmSpy).toHaveBeenCalled();
     await screen.findByText('Recording consent was declined.');
-    expect(startMixRecording).toHaveBeenCalledWith(micStream, expect.any(Function));
+    expect(startMixRecording).toHaveBeenCalledWith(
+      micStream,
+      expect.any(Function),
+      expect.objectContaining({ bitrate: 256000 })
+    );
     expect(screen.queryByText(/Recording in progress/)).toBeNull();
   });
 
@@ -183,7 +266,14 @@ describe('UI components', () => {
       return {
         startedAt: Date.now() - 1000,
         stop: stopMock,
+        pause: vi.fn(),
+        resume: vi.fn(),
+        isPaused: () => false,
         getLevels: () => ({ left: -12, right: -10 }),
+        getWaveform: () => ({ left: new Float32Array([0, 0]), right: new Float32Array([0, 0]) }),
+        mimeType: 'audio/webm',
+        sampleRate: 48000,
+        bitrate: 256000,
       };
     });
     vi.doMock('../../audio/recorder', () => ({ startMixRecording }));
@@ -199,11 +289,19 @@ describe('UI components', () => {
 
     render(<RecordingControls />);
 
+    const pauseButton = screen.getByRole('button', { name: 'Pause' });
+    expect(pauseButton.hasAttribute('disabled')).toBe(true);
+
     fireEvent.click(screen.getByRole('button', { name: /Start Recording/i }));
 
-    await screen.findByText('Recording…');
-    expect(screen.getByText(/Session mix level/i)).toBeTruthy();
-    expect(startMixRecording).toHaveBeenCalledWith(micStream, expect.any(Function));
+    await waitFor(() => expect(pauseButton.hasAttribute('disabled')).toBe(false));
+    expect(screen.queryByText(/Input levels/i)).not.toBeNull();
+    expect(screen.queryByText(/Recording settings/i)).not.toBeNull();
+    expect(startMixRecording).toHaveBeenCalledWith(
+      micStream,
+      expect.any(Function),
+      expect.objectContaining({ bitrate: 256000 })
+    );
   });
 
   it('issues load command with status feedback', async () => {

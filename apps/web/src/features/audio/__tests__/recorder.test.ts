@@ -31,9 +31,11 @@ class FakeRecorder {
   static instances: FakeRecorder[] = [];
   ondataavailable: ((e: any) => void) | null = null;
   onstop: ((ev?: Event) => void) | null = null;
+  onpause: (() => void) | null = null;
+  onresume: (() => void) | null = null;
   options: any;
   startArgs: any[] = [];
-  state: 'inactive' | 'recording' = 'inactive';
+  state: 'inactive' | 'recording' | 'paused' = 'inactive';
   mimeType = 'audio/webm';
   constructor(_stream: any, opts?: any) {
     this.options = opts;
@@ -47,6 +49,16 @@ class FakeRecorder {
     this.state = 'inactive';
     this.onstop?.();
   }
+  pause() {
+    if (this.state !== 'recording') return;
+    this.state = 'paused';
+    this.onpause?.();
+  }
+  resume() {
+    if (this.state !== 'paused') return;
+    this.state = 'recording';
+    this.onresume?.();
+  }
 }
 
 describe('recorder consent', () => {
@@ -59,6 +71,7 @@ describe('recorder consent', () => {
       createGain: () => new FakeGainNode(),
       createChannelSplitter: () => new FakeSplitterNode(),
       createAnalyser: () => new FakeAnalyserNode(),
+      sampleRate: 48000,
     } as any;
     const ctxMod = await import('../context');
     vi.spyOn(ctxMod, 'getAudioContext').mockReturnValue(ctx as any);
@@ -80,6 +93,7 @@ describe('recorder consent', () => {
       createGain: () => new FakeGainNode(),
       createChannelSplitter: () => new FakeSplitterNode(),
       createAnalyser: () => new FakeAnalyserNode(),
+      sampleRate: 48000,
     } as any;
     const ctxMod = await import('../context');
     vi.spyOn(ctxMod, 'getAudioContext').mockReturnValue(ctx as any);
@@ -94,6 +108,16 @@ describe('recorder consent', () => {
     expect(levels.left).toBeGreaterThanOrEqual(-120);
     expect(levels.right).toBeLessThanOrEqual(0);
     expect(levels.right).toBeGreaterThanOrEqual(-120);
+    expect(handle!.mimeType).toBe('audio/webm');
+    expect(handle!.sampleRate).toBe(48000);
+    expect(handle!.isPaused()).toBe(false);
+    handle!.pause();
+    expect(handle!.isPaused()).toBe(true);
+    handle!.resume();
+    expect(handle!.isPaused()).toBe(false);
+    const waveform = handle!.getWaveform();
+    expect(waveform.left).toBeInstanceOf(Float32Array);
+    expect(waveform.right).toBeInstanceOf(Float32Array);
     expect(masterGain.connect).toHaveBeenCalled();
     const blob = await handle!.stop();
     expect(masterGain.disconnect).toHaveBeenCalled();
@@ -110,6 +134,7 @@ describe('recorder consent', () => {
       createGain: () => new FakeGainNode(),
       createChannelSplitter: () => new FakeSplitterNode(),
       createAnalyser: () => new FakeAnalyserNode(),
+      sampleRate: 44100,
     } as any;
     const ctxMod = await import('../context');
     vi.spyOn(ctxMod, 'getAudioContext').mockReturnValue(ctx as any);
@@ -121,6 +146,7 @@ describe('recorder consent', () => {
       { bitrate: 32000, latencyMs: 500 }
     );
     expect(handle).not.toBeNull();
+    expect(handle!.bitrate).toBe(32000);
     const rec = FakeRecorder.instances[0];
     expect(rec.options).toEqual({ audioBitsPerSecond: 32000 });
     expect(rec.startArgs).toEqual([500]);

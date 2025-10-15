@@ -7,10 +7,22 @@ export interface RecordingLevels {
   right: number;
 }
 
+export interface RecordingWaveform {
+  left: Float32Array;
+  right: Float32Array;
+}
+
 export interface RecordingHandle {
   readonly startedAt: number;
+  readonly mimeType: string;
+  readonly bitrate?: number;
+  readonly sampleRate: number;
   stop: () => Promise<Blob>;
+  pause: () => void;
+  resume: () => void;
+  isPaused: () => boolean;
   getLevels: () => RecordingLevels;
+  getWaveform: () => RecordingWaveform;
 }
 
 export interface RecordingOptions {
@@ -67,8 +79,8 @@ export async function startMixRecording(
   splitter.connect(leftAnalyser, 0);
   splitter.connect(rightAnalyser, 1);
 
-  const leftBuffer = new Float32Array(leftAnalyser.fftSize) as Float32Array<ArrayBuffer>;
-  const rightBuffer = new Float32Array(rightAnalyser.fftSize) as Float32Array<ArrayBuffer>;
+  const leftBuffer = new Float32Array(leftAnalyser.fftSize);
+  const rightBuffer = new Float32Array(rightAnalyser.fftSize);
 
   const recOpts: MediaRecorderOptions = {};
   if (opts.bitrate) recOpts.audioBitsPerSecond = opts.bitrate;
@@ -80,6 +92,7 @@ export async function startMixRecording(
 
   const startedAt = Date.now();
   let stopping = false;
+  let paused = false;
   let resolveStop: ((blob: Blob) => void) | null = null;
   const stopPromise = new Promise<Blob>(resolve => {
     resolveStop = resolve;
@@ -113,8 +126,17 @@ export async function startMixRecording(
     }
   };
 
+  recorder.onpause = () => {
+    paused = true;
+  };
+
+  recorder.onresume = () => {
+    paused = false;
+  };
+
   recorder.onstop = () => {
     cleanup();
+    paused = false;
     const mimeType =
       chunks.find(chunk => chunk.type)?.type ||
       recorder.mimeType ||
@@ -126,6 +148,9 @@ export async function startMixRecording(
 
   return {
     startedAt,
+    mimeType: recorder.mimeType || 'audio/webm',
+    bitrate: opts.bitrate,
+    sampleRate: ctx.sampleRate,
     stop: () => {
       if (!stopping) {
         stopping = true;
@@ -137,10 +162,37 @@ export async function startMixRecording(
       }
       return stopPromise;
     },
+    pause: () => {
+      if (recorder.state === 'recording' && !paused) {
+        try {
+          recorder.pause();
+        } catch (err) {
+          console.warn('Failed to pause recording', err);
+        }
+      }
+    },
+    resume: () => {
+      if ((recorder.state === 'paused' || paused) && recorder.state !== 'inactive') {
+        try {
+          recorder.resume();
+        } catch (err) {
+          console.warn('Failed to resume recording', err);
+        }
+      }
+    },
+    isPaused: () => paused || recorder.state === 'paused',
     getLevels: () => ({
       left: analyserToDb(leftAnalyser, leftBuffer),
       right: analyserToDb(rightAnalyser, rightBuffer),
     }),
+    getWaveform: () => {
+      leftAnalyser.getFloatTimeDomainData(leftBuffer);
+      rightAnalyser.getFloatTimeDomainData(rightBuffer);
+      return {
+        left: new Float32Array(leftBuffer),
+        right: new Float32Array(rightBuffer),
+      };
+    },
   };
 }
 
