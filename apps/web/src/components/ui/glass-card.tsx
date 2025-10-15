@@ -59,7 +59,7 @@ export const GlassCard = React.forwardRef<HTMLDivElement, GlassCardProps>(
 );
 GlassCard.displayName = 'GlassCard';
 
-export interface GlassCardSectionProps extends React.HTMLAttributes<HTMLDivElement> {}
+export type GlassCardSectionProps = React.HTMLAttributes<HTMLDivElement>;
 
 export const GlassCardHeader = React.forwardRef<HTMLDivElement, GlassCardSectionProps>(
   ({ className, ...props }, ref) => (
