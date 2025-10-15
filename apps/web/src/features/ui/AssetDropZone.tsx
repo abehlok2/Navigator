@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, type TargetAndTransition } from 'framer-motion';
 
 import { cn } from '../../lib/utils';
 import { useSessionStore } from '../../state/session';
@@ -40,9 +40,9 @@ const overlayVariants = {
   exit: { opacity: 0 },
 };
 
-const borderAnimation = {
+const borderAnimation: TargetAndTransition = {
   backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
-  transition: { duration: 10, ease: 'linear', repeat: Infinity },
+  transition: { duration: 10, ease: [0, 0, 1, 1], repeat: Infinity },
 };
 
 export default function AssetDropZone() {
