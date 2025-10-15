@@ -132,6 +132,8 @@ export default function DashboardPage() {
     return isRole(authRole) ? authRole : null;
   }, [authRole, sessionRole]);
 
+  const canCreateRoom = effectiveRole === 'facilitator';
+
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>(() => readStoredSessions());
   const [sessionStats, setSessionStats] = useState<SessionStats>({});
 
@@ -285,8 +287,11 @@ export default function DashboardPage() {
 
   const openRoomWizard = useCallback(() => {
     resetWizard();
+    if (!canCreateRoom) {
+      setWizardError('Only facilitators can create rooms.');
+    }
     setCreateWizardOpen(true);
-  }, [resetWizard]);
+  }, [canCreateRoom, resetWizard]);
 
   useEffect(() => {
     if (createWizardOpen) return;
@@ -336,6 +341,10 @@ export default function DashboardPage() {
   }, [availableJoinTargets, joinTargetId]);
 
   const handleWizardStart = useCallback(async () => {
+    if (!canCreateRoom) {
+      setWizardError('Only facilitators can create rooms.');
+      return;
+    }
     if (!token) {
       setWizardError('Authentication token is missing.');
       return;
@@ -372,6 +381,7 @@ export default function DashboardPage() {
       setWizardSaving(false);
     }
   }, [
+    canCreateRoom,
     effectiveRole,
     navigate,
     token,
@@ -496,8 +506,6 @@ export default function DashboardPage() {
   );
 
   const displayName = username ?? 'Navigator Operator';
-  const canCreateRoom = effectiveRole === 'facilitator';
-
   if (!token) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950 py-12">
@@ -772,6 +780,7 @@ export default function DashboardPage() {
                     loading={wizardSaving}
                     variant="primary"
                     className="flex-1"
+                    disabled={!canCreateRoom}
                   >
                     Create Room
                   </Button>
