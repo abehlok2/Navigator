@@ -30,6 +30,7 @@ import {
   type Role,
 } from '../features/session/api';
 import ListenerPanel from '../features/ui/ListenerPanel';
+import RoomJoiner from '../features/room/components/RoomJoiner';
 
 const isRole = (value: string | null): value is Role =>
   value === 'facilitator' || value === 'explorer' || value === 'listener';
@@ -75,6 +76,7 @@ export default function SessionPage() {
   const [creatingRoom, setCreatingRoom] = useState(false);
   const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const resetError = useCallback(() => setError(null), []);
   const [roomPassword, setRoomPasswordInput] = useState('');
   const [settingPassword, setSettingPassword] = useState(false);
   const [moderationNotice, setModerationNotice] = useState<ModerationNotice | null>(null);
@@ -440,97 +442,27 @@ export default function SessionPage() {
             {!isListenerSession && <TelemetryDisplay />}
           </section>
           <section className="space-y-8">
-            <Card className="sticky top-8 shadow-lg shadow-slate-200/60">
-              <CardHeader className="border-none pb-0">
-                <CardTitle>Room access</CardTitle>
-                <CardDescription>
-                  Create rooms, join with a password, and connect to the right participant before streaming audio.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6 pt-0">
-                <div className="space-y-2">
-                  <Label htmlFor="room-id">Room ID</Label>
-                  <Input
-                    id="room-id"
-                    type="text"
-                    value={roomId}
-                    onChange={e => setRoomId(e.target.value)}
-                    placeholder="Enter or paste a room identifier"
-                  />
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                    <Button
-                      type="button"
-                      onClick={handleCreateRoom}
-                      disabled={creatingRoom || !canCreateRoom}
-                      title={canCreateRoom ? undefined : 'Only facilitators can create rooms'}
-                      className="h-10 bg-sky-600 px-4 text-sm font-semibold text-white hover:bg-sky-700 disabled:bg-sky-400/60"
-                    >
-                      {creatingRoom ? 'Creating…' : 'Create Room'}
-                    </Button>
-                    {!canCreateRoom && <span>Only facilitators can create new rooms.</span>}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="join-password">Join password</Label>
-                  <Input
-                    id="join-password"
-                    type="password"
-                    value={joinPassword}
-                    onChange={e => setJoinPassword(e.target.value)}
-                    placeholder="Optional room password"
-                    autoComplete="current-password"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="target-id">Connect to</Label>
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                    <div className="relative w-full">
-                      <Select
-                        id="target-id"
-                        value={targetId}
-                        onChange={e => setTargetId(e.target.value)}
-                        disabled={availableTargets.length === 0}
-                      >
-                        <option value="">Select participant…</option>
-                        {availableTargets.map(participant => (
-                          <option key={participant.id} value={participant.id}>
-                            {`${formatRole(participant.role)} — ${participant.id}`}
-                          </option>
-                        ))}
-                      </Select>
-                      <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    </div>
-                    <Button
-                      type="button"
-                      onClick={loadParticipants}
-                      disabled={loadingParticipants || !roomId}
-                      className="h-10 bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:bg-slate-400/70"
-                    >
-                      {loadingParticipants ? 'Loading…' : 'Refresh'}
-                    </Button>
-                  </div>
-                  <p className="text-xs text-slate-500">
-                    Participants appear once they have joined the room. Facilitators can connect to any explorer or listener.
-                  </p>
-                </div>
-                <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
-                  <Button
-                    type="button"
-                    onClick={handleConnect}
-                    disabled={connecting || !targetId}
-                    className="h-11 w-full justify-center bg-emerald-500 text-sm font-semibold text-white hover:bg-emerald-600 disabled:bg-emerald-300/70"
-                  >
-                    {connecting ? 'Connecting…' : 'Connect'}
-                  </Button>
-                  <div className="flex flex-col gap-2 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-                    <span>
-                      {participantId ? `Participant ID: ${participantId}` : 'No active participant connection yet.'}
-                    </span>
-                    {error && <span className="font-medium text-rose-600">{error}</span>}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <RoomJoiner
+              roomId={roomId}
+              onRoomIdChange={setRoomId}
+              canCreateRoom={canCreateRoom}
+              creatingRoom={creatingRoom}
+              onCreateRoom={handleCreateRoom}
+              joinPassword={joinPassword}
+              onJoinPasswordChange={setJoinPassword}
+              participants={participants}
+              availableTargets={availableTargets}
+              loadingParticipants={loadingParticipants}
+              onRefreshParticipants={loadParticipants}
+              targetId={targetId}
+              onTargetChange={setTargetId}
+              onConnect={handleConnect}
+              connecting={connecting}
+              participantId={participantId}
+              error={error}
+              onResetError={resetError}
+              role={isRole(role) ? role : null}
+            />
             {(participants.length > 0 || canModerateParticipants) && (
               <Card className="space-y-0 shadow-lg shadow-slate-200/60">
                 <CardHeader className="border-none pb-0">
