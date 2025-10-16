@@ -117,10 +117,11 @@ const formatRole = (role: Role | null): string =>
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { token, username, role: authRole } = useAuthStore(state => ({
+  const { token, username, role: authRole, logout } = useAuthStore(state => ({
     token: state.token,
     username: state.username,
     role: state.role,
+    logout: state.logout,
   }));
   const { role: sessionRole, connection } = useSessionStore(state => ({
     role: state.role,
@@ -265,6 +266,18 @@ export default function DashboardPage() {
 
   const [createWizardOpen, setCreateWizardOpen] = useState(false);
   const [joinModalOpen, setJoinModalOpen] = useState(false);
+
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const handleLogout = useCallback(async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await logout();
+    } finally {
+      setLoggingOut(false);
+    }
+  }, [loggingOut, logout]);
 
   const [wizardName, setWizardName] = useState('Room 1');
   const [wizardTemplate, setWizardTemplate] = useState('Room');
@@ -510,13 +523,24 @@ export default function DashboardPage() {
       <div className="mx-auto max-w-7xl px-6 py-12">
         {/* Header */}
         <header className="mb-12">
-          <div className="mb-4">
-            <h1 className="text-4xl font-bold text-white mb-2">
-              Welcome back, {displayName.split(' ')[0]}
-            </h1>
-            <p className="text-lg text-slate-400">
-              {formatRole(effectiveRole)} • {sortedActiveSessions.length} active rooms
-            </p>
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-white mb-2">
+                Welcome back, {displayName.split(' ')[0]}
+              </h1>
+              <p className="text-lg text-slate-400">
+                {formatRole(effectiveRole)} • {sortedActiveSessions.length} active rooms
+              </p>
+            </div>
+            <Button
+              onClick={handleLogout}
+              variant="ghost"
+              size="sm"
+              className="self-start sm:self-auto"
+              loading={loggingOut}
+            >
+              Log out
+            </Button>
           </div>
 
           {/* Stats Grid */}
