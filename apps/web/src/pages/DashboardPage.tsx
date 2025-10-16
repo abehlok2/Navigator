@@ -304,7 +304,6 @@ export default function DashboardPage() {
   const [joinParticipants, setJoinParticipants] = useState<ParticipantSummary[]>([]);
   const [joinTargetId, setJoinTargetId] = useState('');
   const [joinLoadingParticipants, setJoinLoadingParticipants] = useState(false);
-  const [joinCreatingRoom, setJoinCreatingRoom] = useState(false);
   const [joinConnecting, setJoinConnecting] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
 
@@ -403,32 +402,15 @@ export default function DashboardPage() {
     [handleWizardStart]
   );
 
-  const handleJoinCreateRoom = useCallback(async () => {
-    if (!token) {
-      setJoinError('Authentication token is missing.');
+  const handleJoinCreateRoom = useCallback(() => {
+    if (!canCreateRoom) {
+      setJoinError('Only facilitators can create rooms.');
       return false;
     }
-    setJoinCreatingRoom(true);
-    setJoinError(null);
-    try {
-      const roomId = await createRoom(token);
-      setJoinRoomId(roomId);
-      const now = new Date().toISOString();
-      upsertSession({
-        roomId,
-        lastAccessed: now,
-        role: effectiveRole,
-        passwordEnabled: false,
-      });
-      return true;
-    } catch (err) {
-      console.error(err);
-      setJoinError('Failed to create room.');
-      return false;
-    } finally {
-      setJoinCreatingRoom(false);
-    }
-  }, [effectiveRole, token, upsertSession]);
+    setJoinModalOpen(false);
+    openRoomWizard();
+    return false;
+  }, [canCreateRoom, openRoomWizard]);
 
   const handleRefreshParticipants = useCallback(async () => {
     if (!token) {
@@ -829,7 +811,7 @@ export default function DashboardPage() {
                 roomId={joinRoomId}
                 onRoomIdChange={setJoinRoomId}
                 canCreateRoom={canCreateRoom}
-                creatingRoom={joinCreatingRoom}
+                creatingRoom={false}
                 onCreateRoom={handleJoinCreateRoom}
                 joinPassword={joinPassword}
                 onJoinPasswordChange={setJoinPassword}
