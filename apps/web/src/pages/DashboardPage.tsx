@@ -656,9 +656,9 @@ export default function DashboardPage() {
       {/* Create Room Wizard Modal - FIXED */}
       <Dialog.Root open={createWizardOpen} onOpenChange={setCreateWizardOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/95 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
           <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-2xl translate-x-[-50%] translate-y-[-50%] p-4 duration-200 focus:outline-none focus-visible:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
-            <div className="rounded-2xl bg-slate-900 border border-white/10 p-8">
+            <div className="rounded-2xl bg-slate-950 shadow-2xl border border-white/10 p-8">
               <div className="flex items-start justify-between mb-6">
                 <div>
                   <Dialog.Title className="text-2xl font-bold text-white mb-2">
@@ -785,7 +785,7 @@ export default function DashboardPage() {
       {/* Join Room Modal - FIXED */}
       <Dialog.Root open={joinModalOpen} onOpenChange={setJoinModalOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/95 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
           <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-2xl translate-x-[-50%] translate-y-[-50%] p-4 duration-200 focus:outline-none focus-visible:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
             <Dialog.Title className="sr-only">Join Room</Dialog.Title>
             <Dialog.Description className="sr-only">Connect to an existing session</Dialog.Description>
