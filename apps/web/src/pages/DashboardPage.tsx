@@ -266,8 +266,8 @@ export default function DashboardPage() {
   const [createWizardOpen, setCreateWizardOpen] = useState(false);
   const [joinModalOpen, setJoinModalOpen] = useState(false);
 
-  const [wizardName, setWizardName] = useState('');
-  const [wizardTemplate, setWizardTemplate] = useState('mission');
+  const [wizardName, setWizardName] = useState('Room 1');
+  const [wizardTemplate, setWizardTemplate] = useState('Room');
   const [wizardPassword, setWizardPassword] = useState('');
   const [wizardAutoRecord, setWizardAutoRecord] = useState(true);
   const [wizardAllowObservers, setWizardAllowObservers] = useState(false);
@@ -276,7 +276,7 @@ export default function DashboardPage() {
   const [wizardError, setWizardError] = useState<string | null>(null);
   const resetWizard = useCallback(() => {
     setWizardName('');
-    setWizardTemplate('mission');
+    setWizardTemplate('Room');
     setWizardPassword('');
     setWizardAutoRecord(true);
     setWizardAllowObservers(false);
@@ -290,6 +290,7 @@ export default function DashboardPage() {
     if (!canCreateRoom) {
       setWizardError('Only facilitators can create rooms.');
     }
+    console.log("Creating Room...");
     setCreateWizardOpen(true);
   }, [canCreateRoom, resetWizard]);
 
@@ -598,7 +599,7 @@ export default function DashboardPage() {
                 {sortedActiveSessions.map(session => {
                   const stats = sessionStats[session.roomId] ?? { participants: 0, online: 0 };
                   const isActive = stats.online > 0;
-                  
+
                   return (
                     <motion.div
                       key={session.roomId}
@@ -620,7 +621,7 @@ export default function DashboardPage() {
                               </span>
                             )}
                           </div>
-                          
+
                           <div className="flex flex-wrap gap-3 text-sm text-slate-400 mb-3">
                             <span>Room {session.roomId.slice(0, 8)}</span>
                             <span>•</span>
