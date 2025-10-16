@@ -558,26 +558,20 @@ const AddAssetModal: React.FC<{
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur" />
-        <Dialog.Content className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.94 }}
-            className="w-full max-w-2xl"
-          >
-            <GlassCard variant="elevated" glowColor="blue" className="overflow-hidden">
-              <GlassCardHeader className="border-b border-white/10 pb-4">
-                <Dialog.Title asChild>
-                  <GlassCardTitle className="text-2xl text-white">Add assets</GlassCardTitle>
-                </Dialog.Title>
-                <Dialog.Description asChild>
-                  <GlassCardDescription>
-                    Upload audio files for automatic metadata or manually create an entry.
-                  </GlassCardDescription>
-                </Dialog.Description>
-              </GlassCardHeader>
-              <GlassCardContent className="gap-6">
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-2xl translate-x-[-50%] translate-y-[-50%] p-4 duration-200 focus:outline-none focus-visible:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+          <GlassCard variant="elevated" glowColor="blue" className="overflow-hidden">
+            <GlassCardHeader className="border-b border-white/10 pb-4">
+              <Dialog.Title asChild>
+                <GlassCardTitle className="text-2xl text-white">Add assets</GlassCardTitle>
+              </Dialog.Title>
+              <Dialog.Description asChild>
+                <GlassCardDescription>
+                  Upload audio files for automatic metadata or manually create an entry.
+                </GlassCardDescription>
+              </Dialog.Description>
+            </GlassCardHeader>
+            <GlassCardContent className="gap-6">
                 <div className="flex flex-col gap-3 rounded-xl border border-dashed border-white/15 bg-white/5 p-6 text-center">
                   <FolderPlus className="mx-auto h-10 w-10 text-purple-300" />
                   <p className="text-sm text-slate-200">
@@ -677,9 +671,8 @@ const AddAssetModal: React.FC<{
                     </ul>
                   </div>
                 )}
-              </GlassCardContent>
-            </GlassCard>
-          </motion.div>
+            </GlassCardContent>
+          </GlassCard>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
@@ -694,47 +687,40 @@ const ConfirmationDialog: React.FC<{
 }> = ({ open, onOpenChange, onConfirm, confirming }) => (
   <Dialog.Root open={open} onOpenChange={onOpenChange}>
     <Dialog.Portal>
-      <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur" />
-      <Dialog.Content className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.94 }}
-          className="w-full max-w-lg"
-        >
-          <GlassCard variant="elevated" glowColor="purple">
-            <GlassCardHeader className="border-b border-white/10 pb-4">
-              <Dialog.Title asChild>
-                <GlassCardTitle className="text-2xl text-white">Send manifest?</GlassCardTitle>
-              </Dialog.Title>
-              <Dialog.Description asChild>
-                <GlassCardDescription>
-                  This will broadcast the updated manifest to everyone connected. Are you sure you want to continue?
-                </GlassCardDescription>
-              </Dialog.Description>
-            </GlassCardHeader>
-            <GlassCardContent>
-              <div className="flex flex-col gap-4 text-sm text-slate-200">
-                <p>
-                  Changes will overwrite the previous manifest. Double-check any warnings before confirming.
-                </p>
-                <div className="flex justify-end gap-3">
-                  <Button variant="ghost" onClick={() => onOpenChange(false)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="primary"
-                    leadingIcon={<Send className="h-4 w-4" />}
-                    onClick={onConfirm}
-                    loading={confirming}
-                  >
-                    Send manifest
-                  </Button>
-                </div>
+      <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+      <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-lg translate-x-[-50%] translate-y-[-50%] p-4 duration-200 focus:outline-none focus-visible:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+        <GlassCard variant="elevated" glowColor="purple">
+          <GlassCardHeader className="border-b border-white/10 pb-4">
+            <Dialog.Title asChild>
+              <GlassCardTitle className="text-2xl text-white">Send manifest?</GlassCardTitle>
+            </Dialog.Title>
+            <Dialog.Description asChild>
+              <GlassCardDescription>
+                This will broadcast the updated manifest to everyone connected. Are you sure you want to continue?
+              </GlassCardDescription>
+            </Dialog.Description>
+          </GlassCardHeader>
+          <GlassCardContent>
+            <div className="flex flex-col gap-4 text-sm text-slate-200">
+              <p>
+                Changes will overwrite the previous manifest. Double-check any warnings before confirming.
+              </p>
+              <div className="flex justify-end gap-3">
+                <Button variant="ghost" onClick={() => onOpenChange(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  leadingIcon={<Send className="h-4 w-4" />}
+                  onClick={onConfirm}
+                  loading={confirming}
+                >
+                  Send manifest
+                </Button>
               </div>
-            </GlassCardContent>
-          </GlassCard>
-        </motion.div>
+            </div>
+          </GlassCardContent>
+        </GlassCard>
       </Dialog.Content>
     </Dialog.Portal>
   </Dialog.Root>

@@ -440,51 +440,44 @@ function NotesDialog({ recording, open, onClose, onSave }: NotesDialogProps) {
   return (
     <Dialog.Root open={open} onOpenChange={next => !next && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur" />
-        <Dialog.Content className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.94 }}
-            className="w-full max-w-xl"
-          >
-            <GlassCard variant="elevated" glowColor="purple" className="space-y-6">
-              <GlassCardHeader className="mb-2 flex flex-col gap-3 border-b border-white/10 pb-4">
-                <Dialog.Title asChild>
-                  <GlassCardTitle className="text-2xl text-white">Add session notes</GlassCardTitle>
-                </Dialog.Title>
-                <Dialog.Description asChild>
-                  <GlassCardDescription>
-                    Capture what stood out, identify highlights, or jot down follow-up tasks linked to this
-                    recording.
-                  </GlassCardDescription>
-                </Dialog.Description>
-              </GlassCardHeader>
-              <GlassCardContent className="gap-5">
-                <div className="space-y-2">
-                  <Label htmlFor="recording-notes" className="text-slate-200">
-                    Notes
-                  </Label>
-                  <textarea
-                    id="recording-notes"
-                    rows={6}
-                    value={value}
-                    onChange={event => setValue(event.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-white/80 p-4 text-sm text-slate-900 shadow-inner focus:outline-none focus:ring-2 focus:ring-sky-200"
-                    placeholder="Describe the moment, timestamp highlights, or next steps for collaborators."
-                  />
-                </div>
-              </GlassCardContent>
-              <div className="flex flex-wrap items-center justify-end gap-3 border-t border-white/10 pt-4">
-                <Button variant="ghost" onClick={onClose}>
-                  Cancel
-                </Button>
-                <Button variant="primary" onClick={() => onSave(value)}>
-                  Save notes
-                </Button>
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-xl translate-x-[-50%] translate-y-[-50%] p-4 duration-200 focus:outline-none focus-visible:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+          <GlassCard variant="elevated" glowColor="purple" className="space-y-6">
+            <GlassCardHeader className="mb-2 flex flex-col gap-3 border-b border-white/10 pb-4">
+              <Dialog.Title asChild>
+                <GlassCardTitle className="text-2xl text-white">Add session notes</GlassCardTitle>
+              </Dialog.Title>
+              <Dialog.Description asChild>
+                <GlassCardDescription>
+                  Capture what stood out, identify highlights, or jot down follow-up tasks linked to this
+                  recording.
+                </GlassCardDescription>
+              </Dialog.Description>
+            </GlassCardHeader>
+            <GlassCardContent className="gap-5">
+              <div className="space-y-2">
+                <Label htmlFor="recording-notes" className="text-slate-200">
+                  Notes
+                </Label>
+                <textarea
+                  id="recording-notes"
+                  rows={6}
+                  value={value}
+                  onChange={event => setValue(event.target.value)}
+                  className="w-full rounded-2xl border border-white/10 bg-white/80 p-4 text-sm text-slate-900 shadow-inner focus:outline-none focus:ring-2 focus:ring-sky-200"
+                  placeholder="Describe the moment, timestamp highlights, or next steps for collaborators."
+                />
               </div>
-            </GlassCard>
-          </motion.div>
+            </GlassCardContent>
+            <div className="flex flex-wrap items-center justify-end gap-3 border-t border-white/10 pt-4">
+              <Button variant="ghost" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={() => onSave(value)}>
+                Save notes
+              </Button>
+            </div>
+          </GlassCard>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
@@ -596,15 +589,9 @@ function PlaybackModal({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur" />
-        <Dialog.Content className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="w-full max-w-4xl"
-          >
-            <GlassCard variant="elevated" glowColor="blue" className="space-y-8">
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-4xl translate-x-[-50%] translate-y-[-50%] p-4 duration-200 focus:outline-none focus-visible:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+          <GlassCard variant="elevated" glowColor="blue" className="space-y-8">
               <GlassCardHeader className="border-b border-white/10 pb-4">
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -768,7 +755,6 @@ function PlaybackModal({
               </GlassCardContent>
               <audio ref={audioRef} src={recording.url} preload="metadata" />
             </GlassCard>
-          </motion.div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
