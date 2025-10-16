@@ -657,14 +657,8 @@ export default function DashboardPage() {
       <Dialog.Root open={createWizardOpen} onOpenChange={setCreateWizardOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-          <Dialog.Content className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] focus:outline-none">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.2 }}
-              className="w-full max-w-2xl rounded-2xl bg-slate-900 border border-white/10 p-8 max-h-[90vh] overflow-y-auto"
-            >
+          <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-2xl translate-x-[-50%] translate-y-[-50%] p-4 duration-200 focus:outline-none focus-visible:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+            <div className="rounded-2xl bg-slate-900 border border-white/10 p-8">
               <div className="flex items-start justify-between mb-6">
                 <div>
                   <Dialog.Title className="text-2xl font-bold text-white mb-2">
@@ -674,7 +668,7 @@ export default function DashboardPage() {
                     Configure your new collaborative session
                   </Dialog.Description>
                 </div>
-                <Dialog.Close className="rounded-lg p-2 text-white hover:bg-white/10 transition-colors">
+                <Dialog.Close className="rounded-lg p-2 hover:bg-white/10 transition-colors text-white">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -783,7 +777,7 @@ export default function DashboardPage() {
                   </Dialog.Close>
                 </div>
               </form>
-            </motion.div>
+            </div>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
@@ -792,18 +786,12 @@ export default function DashboardPage() {
       <Dialog.Root open={joinModalOpen} onOpenChange={setJoinModalOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-          <Dialog.Content className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] focus:outline-none p-4">
+          <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-2xl translate-x-[-50%] translate-y-[-50%] p-4 duration-200 focus:outline-none focus-visible:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
             <Dialog.Title className="sr-only">Join Room</Dialog.Title>
             <Dialog.Description className="sr-only">Connect to an existing session</Dialog.Description>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.2 }}
-              className="w-full max-w-2xl relative"
-            >
+            <div className="relative w-full">
               <Dialog.Close asChild>
-                <button className="absolute right-5 top-5 z-10 rounded-lg p-2 text-white hover:bg-white/10 transition-colors">
+                <button className="absolute right-5 top-5 z-10 rounded-lg p-2 text-white hover:bg-white/10">
                   <span className="sr-only">Close</span>
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -831,7 +819,7 @@ export default function DashboardPage() {
                 onResetError={() => setJoinError(null)}
                 role={effectiveRole}
               />
-            </motion.div>
+            </div>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
