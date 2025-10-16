@@ -218,6 +218,31 @@ app.post('/rooms/:roomId/kick', authMiddleware('facilitator'), (req, res) => {
   res.sendStatus(204);
 });
 
+// Development-only endpoint to update user role
+if (process.env.NODE_ENV !== 'production') {
+  app.post('/dev/update-role', authMiddleware(), async (req, res) => {
+    const { role } = req.body as { role: Role };
+    const user = (req as any).user as AuthPayload;
+
+    try {
+      const users = await loadUsers();
+      if (users[user.username]) {
+        users[user.username].role = role;
+        await saveUsers(users);
+
+        // Generate new token with updated role
+        const token = await login(user.username, users[user.username].passwordHash);
+        res.json({ token, message: 'Role updated' });
+      } else {
+        res.status(404).json({ error: 'User not found' });
+      }
+    } catch (err) {
+      console.error('Failed to update role', err);
+      res.status(500).json({ error: 'Failed to update role' });
+    }
+  });
+}
+
 const keyFile = process.env.SSL_KEY_FILE || 'key.pem';
 const certFile = process.env.SSL_CERT_FILE || 'cert.pem';
 
