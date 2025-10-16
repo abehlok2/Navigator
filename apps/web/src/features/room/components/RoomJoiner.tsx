@@ -133,14 +133,13 @@ export default function RoomJoiner({
     }
   };
 
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleNext();
+  };
+
   return (
-    <form 
-      onSubmit={(e) => {
-        e.preventDefault();
-        handleNext();
-      }}
-      className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm"
-    >
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm">
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
@@ -169,178 +168,181 @@ export default function RoomJoiner({
         </div>
       </div>
 
-      {/* Content */}
-      <div className="mb-6 min-h-[200px]">
-        {step === 'room' && (
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="room-id" className="text-white mb-2 block">
-                Room ID
-              </Label>
-              <Input
-                id="room-id"
-                value={roomId}
-                onChange={e => onRoomIdChange(e.target.value)}
-                placeholder="Enter room ID"
-                className="bg-white/5 border-white/10 text-white"
-                autoComplete="off"
-              />
-            </div>
-            <Button
-              type="button"
-              onClick={handleCreateRoom}
-              disabled={creatingRoom || !canCreateRoom}
-              loading={creatingRoom}
-              variant="secondary"
-              className="w-full"
-            >
-              Create New Room
-            </Button>
-            {!canCreateRoom && (
-              <p className="text-xs text-slate-400">
-                Only facilitators can create rooms
-              </p>
-            )}
-          </div>
-        )}
-
-        {step === 'password' && (
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="room-password" className="text-white mb-2 block">
-                Room Password (Optional)
-              </Label>
-              <Input
-                id="room-password"
-                type="password"
-                value={joinPassword}
-                onChange={e => onJoinPasswordChange(e.target.value)}
-                placeholder="Leave blank if none"
-                className="bg-white/5 border-white/10 text-white"
-                autoComplete="current-password"
-              />
-            </div>
-            <p className="text-xs text-slate-400">
-              Enter the password if this room is protected
-            </p>
-          </div>
-        )}
-
-        {step === 'participant' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-white">
-                Select Participant ({availableTargets.length} available)
-              </h3>
+      {/* Content - wrapped in form only for steps with inputs */}
+      <form onSubmit={handleFormSubmit}>
+        <div className="mb-6 min-h-[200px]">
+          {step === 'room' && (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="room-id" className="text-white mb-2 block">
+                  Room ID
+                </Label>
+                <Input
+                  id="room-id"
+                  value={roomId}
+                  onChange={e => onRoomIdChange(e.target.value)}
+                  placeholder="Enter room ID"
+                  className="bg-white/5 border-white/10 text-white"
+                  autoComplete="off"
+                />
+              </div>
               <Button
                 type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => onRefreshParticipants()}
-                disabled={loadingParticipants}
-                loading={loadingParticipants}
+                onClick={handleCreateRoom}
+                disabled={creatingRoom || !canCreateRoom}
+                loading={creatingRoom}
+                variant="secondary"
+                className="w-full"
               >
-                Refresh
+                Create New Room
               </Button>
-            </div>
-
-            {availableTargets.length > 0 ? (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {availableTargets.map(p => (
-                  <button
-                    key={p.id}
-                    onClick={() => onTargetChange(p.id)}
-                    className={cn(
-                      'w-full rounded-xl border p-4 text-left transition-colors',
-                      targetId === p.id
-                        ? 'border-violet-400 bg-violet-500/10'
-                        : 'border-white/10 bg-white/5 hover:bg-white/10'
-                    )}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium text-white">{p.id}</div>
-                        <div className="text-sm text-slate-400">
-                          {formatRole(p.role)}
-                        </div>
-                      </div>
-                      <Badge variant={p.connected ? 'success' : 'muted'}>
-                        {p.connected ? 'Online' : 'Offline'}
-                      </Badge>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-xl border border-dashed border-white/20 bg-white/5 p-8 text-center">
-                <p className="text-sm text-slate-300">No participants available</p>
-                <p className="text-xs text-slate-400 mt-1">
-                  Refresh once others join the room
+              {!canCreateRoom && (
+                <p className="text-xs text-slate-400">
+                  Only facilitators can create rooms
                 </p>
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )}
 
-        {step === 'confirm' && (
-          <div className="space-y-4">
-            <h3 className="text-sm font-medium text-white mb-3">Review Details</h3>
-            <div className="space-y-3 rounded-xl border border-white/10 bg-white/5 p-4">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-400">Room ID:</span>
-                <span className="text-white font-mono">{roomId}</span>
+          {step === 'password' && (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="room-password" className="text-white mb-2 block">
+                  Room Password (Optional)
+                </Label>
+                <Input
+                  id="room-password"
+                  type="password"
+                  value={joinPassword}
+                  onChange={e => onJoinPasswordChange(e.target.value)}
+                  placeholder="Leave blank if none"
+                  className="bg-white/5 border-white/10 text-white"
+                  autoComplete="current-password"
+                />
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-400">Password:</span>
-                <span className="text-white">
-                  {joinPassword ? 'Provided' : 'None'}
-                </span>
+              <p className="text-xs text-slate-400">
+                Enter the password if this room is protected
+              </p>
+            </div>
+          )}
+
+          {step === 'participant' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-medium text-white">
+                  Select Participant ({availableTargets.length} available)
+                </h3>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => onRefreshParticipants()}
+                  disabled={loadingParticipants}
+                  loading={loadingParticipants}
+                >
+                  Refresh
+                </Button>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-400">Target:</span>
-                <span className="text-white font-mono">
-                  {selectedTarget?.id || 'None'}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-400">Role:</span>
-                <span className="text-white">
-                  {selectedTarget ? formatRole(selectedTarget.role) : '—'}
-                </span>
+
+              {availableTargets.length > 0 ? (
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {availableTargets.map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => onTargetChange(p.id)}
+                      className={cn(
+                        'w-full rounded-xl border p-4 text-left transition-colors',
+                        targetId === p.id
+                          ? 'border-violet-400 bg-violet-500/10'
+                          : 'border-white/10 bg-white/5 hover:bg-white/10'
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium text-white">{p.id}</div>
+                          <div className="text-sm text-slate-400">
+                            {formatRole(p.role)}
+                          </div>
+                        </div>
+                        <Badge variant={p.connected ? 'success' : 'muted'}>
+                          {p.connected ? 'Online' : 'Offline'}
+                        </Badge>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-white/20 bg-white/5 p-8 text-center">
+                  <p className="text-sm text-slate-300">No participants available</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Refresh once others join the room
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {step === 'confirm' && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium text-white mb-3">Review Details</h3>
+              <div className="space-y-3 rounded-xl border border-white/10 bg-white/5 p-4">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-400">Room ID:</span>
+                  <span className="text-white font-mono">{roomId}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-400">Password:</span>
+                  <span className="text-white">
+                    {joinPassword ? 'Provided' : 'None'}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-400">Target:</span>
+                  <span className="text-white font-mono">
+                    {selectedTarget?.id || 'None'}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-400">Role:</span>
+                  <span className="text-white">
+                    {selectedTarget ? formatRole(selectedTarget.role) : '—'}
+                  </span>
+                </div>
               </div>
             </div>
+          )}
+        </div>
+
+        {/* Error */}
+        {(stepMessage || error) && (
+          <div className="mb-4 rounded-xl border border-rose-400/50 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+            {stepMessage || error}
           </div>
         )}
-      </div>
 
-      {/* Error */}
-      {(stepMessage || error) && (
-        <div className="mb-4 rounded-xl border border-rose-400/50 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-          {stepMessage || error}
+        {/* Actions */}
+        <div className="flex gap-3">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleBack}
+            disabled={currentIndex === 0 || connecting}
+            className="flex-1"
+          >
+            Back
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={(step !== 'confirm' && !canProgress()) || connecting}
+            loading={step === 'confirm' && connecting}
+            className="flex-1"
+          >
+            {step === 'confirm' ? 'Connect' : 'Next'}
+          </Button>
         </div>
-      )}
-
-      {/* Actions */}
-      <div className="flex gap-3">
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={handleBack}
-          disabled={currentIndex === 0 || connecting}
-          className="flex-1"
-        >
-          Back
-        </Button>
-        <Button
-          type="submit"
-          variant="primary"
-          disabled={(step !== 'confirm' && !canProgress()) || connecting}
-          loading={step === 'confirm' && connecting}
-          className="flex-1"
-        >
-          {step === 'confirm' ? 'Connect' : 'Next'}
-        </Button>
-      </div>
-    </form>
+      </form>
+    </div>
   );
 }
