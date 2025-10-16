@@ -394,6 +394,14 @@ export default function DashboardPage() {
     wizardTemplate,
   ]);
 
+  const handleWizardSubmit = useCallback(
+    (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      void handleWizardStart();
+    },
+    [handleWizardStart]
+  );
+
   const handleJoinCreateRoom = useCallback(async () => {
     if (!token) {
       setJoinError('Authentication token is missing.');
@@ -689,7 +697,7 @@ export default function DashboardPage() {
                 </Dialog.Close>
               </div>
 
-              <div className="space-y-6">
+              <form onSubmit={handleWizardSubmit} className="space-y-6">
                 <div>
                   <Label htmlFor="wizard-name" className="text-white mb-2 block">Room Name</Label>
                   <Input
@@ -776,7 +784,7 @@ export default function DashboardPage() {
 
                 <div className="flex gap-3 pt-4">
                   <Button
-                    onClick={handleWizardStart}
+                    type="submit"
                     loading={wizardSaving}
                     variant="primary"
                     className="flex-1"
@@ -785,12 +793,12 @@ export default function DashboardPage() {
                     Create Room
                   </Button>
                   <Dialog.Close asChild>
-                    <Button variant="ghost" className="flex-1">
+                    <Button type="button" variant="ghost" className="flex-1">
                       Cancel
                     </Button>
                   </Dialog.Close>
                 </div>
-              </div>
+              </form>
             </motion.div>
           </Dialog.Content>
         </Dialog.Portal>
