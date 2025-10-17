@@ -117,22 +117,33 @@ export function addParticipant(roomId: string, role: Role): Participant {
   return participant;
 }
 
+export function destroyRoom(roomId: string): void {
+  const room = rooms.get(roomId);
+  if (!room) return;
+  room.participants.forEach(participant => {
+    participant.ws?.close();
+  });
+  rooms.delete(roomId);
+  persist();
+}
+
 export function removeParticipant(roomId: string, participantId: string): void {
   const room = rooms.get(roomId);
-  if (room?.participants.delete(participantId)) {
-    persist();
+  if (!room) return;
+  const participant = room.participants.get(participantId);
+  if (!participant) return;
+  participant.ws?.close();
+  const wasFacilitator = participant.role === 'facilitator';
+  room.participants.delete(participantId);
+  if (wasFacilitator) {
+    destroyRoom(roomId);
+    return;
   }
+  persist();
 }
 
 export function kickParticipant(roomId: string, participantId: string): void {
-  const room = rooms.get(roomId);
-  const participant = room?.participants.get(participantId);
-  if (participant?.ws) {
-    participant.ws.close();
-  }
-  if (room?.participants.delete(participantId)) {
-    persist();
-  }
+  removeParticipant(roomId, participantId);
 }
 
 export function setRole(roomId: string, participantId: string, role: Role): void {

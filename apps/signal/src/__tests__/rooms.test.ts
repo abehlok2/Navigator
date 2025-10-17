@@ -88,4 +88,31 @@ describe('rooms', () => {
     expect(getParticipant(room.id, participant.id)).toBeUndefined();
     expect(ws.close).toHaveBeenCalled();
   });
+
+  it('closes the room when the facilitator leaves', async () => {
+    const {
+      createRoom,
+      addParticipant,
+      attachSocket,
+      removeParticipant,
+      getRoom,
+    } = await import('../rooms.ts');
+    const room = createRoom('room-close');
+    const facilitator = addParticipant(room.id, 'facilitator');
+    const listener = addParticipant(room.id, 'listener');
+    const explorer = addParticipant(room.id, 'explorer');
+
+    const listenerWs = { close: vi.fn() } as any;
+    const explorerWs = { close: vi.fn() } as any;
+    attachSocket(room.id, listener.id, listenerWs);
+    attachSocket(room.id, explorer.id, explorerWs);
+
+    removeParticipant(room.id, listener.id);
+    expect(getRoom(room.id)).toBeDefined();
+    expect(listenerWs.close).toHaveBeenCalledTimes(1);
+
+    removeParticipant(room.id, facilitator.id);
+    expect(getRoom(room.id)).toBeUndefined();
+    expect(explorerWs.close).toHaveBeenCalledTimes(1);
+  });
 });
