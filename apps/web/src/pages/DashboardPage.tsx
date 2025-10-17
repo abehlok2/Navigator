@@ -389,7 +389,13 @@ export default function DashboardPage() {
       }
     } catch (err) {
       console.error(err);
-      setWizardError('Failed to create room.');
+      // Show the actual error message from the backend
+      const message = err instanceof Error ? err.message : 'Failed to create room';
+      setWizardError(
+        message.includes('403') || message.includes('Forbidden')
+          ? 'Permission denied. Your account may not have facilitator privileges.'
+          : message
+      );
     } finally {
       setWizardSaving(false);
     }

@@ -13,7 +13,20 @@ export async function createRoom(token: string): Promise<string> {
     method: 'POST',
     headers: authHeaders(token),
   });
-  if (!res.ok) throw new Error('failed to create room');
+
+  if (!res.ok) {
+    // Try to get error details from response
+    let errorMessage = 'failed to create room';
+    try {
+      const errorData = await res.json();
+      errorMessage = errorData.message || errorData.error || errorMessage;
+    } catch {
+      // Response wasn't JSON, use status text
+      errorMessage = `${res.status}: ${res.statusText}`;
+    }
+    throw new Error(errorMessage);
+  }
+
   const data = (await res.json()) as { roomId: string };
   return data.roomId;
 }
