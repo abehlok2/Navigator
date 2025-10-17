@@ -1,1 +1,7 @@
-{}
+{
+  "abehlok": {
+    "username": "abehlok",
+    "passwordHash": "$2a$10$g6gE6yO.AeKgq6aQZ.S3G.ZBQLMOhv/8uLEE/A7Atebv1nXsV4jum",
+    "role": "facilitator"
+  }
+}
