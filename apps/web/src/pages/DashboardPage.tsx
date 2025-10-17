@@ -354,7 +354,7 @@ export default function DashboardPage() {
   }, [availableJoinTargets, joinTargetId]);
 
   const handleWizardStart = useCallback(async () => {
-    if (!canCreateRoom) {
+    if (!canCreateRoom || effectiveRole !== 'facilitator') {
       setWizardError('Only facilitators can create rooms.');
       return;
     }
@@ -365,7 +365,7 @@ export default function DashboardPage() {
     setWizardSaving(true);
     setWizardError(null);
     try {
-      const roomId = await createRoom(token);
+      const roomId = await createRoom(token, effectiveRole);
       if (wizardPassword.trim().length > 0) {
         await setRoomPassword(roomId, token, wizardPassword.trim());
       }

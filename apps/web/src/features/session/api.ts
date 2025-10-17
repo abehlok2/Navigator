@@ -2,13 +2,26 @@ import { apiUrl } from '../../config';
 
 export type Role = 'facilitator' | 'explorer' | 'listener';
 
+function normalizeToken(token: string): string {
+  const trimmed = token.trim();
+  if (!trimmed) {
+    throw new Error('Authentication token is required.');
+  }
+  return trimmed;
+}
+
 function authHeaders(token: string): HeadersInit {
+  const normalized = normalizeToken(token);
   return {
-    Authorization: `Bearer ${token}`,
+    Authorization: `Bearer ${normalized}`,
   };
 }
 
-export async function createRoom(token: string): Promise<string> {
+export async function createRoom(token: string, role: Role = 'facilitator'): Promise<string> {
+  if (role !== 'facilitator') {
+    throw new Error('Only facilitators can create rooms.');
+  }
+
   const res = await fetch(apiUrl('/rooms'), {
     method: 'POST',
     headers: authHeaders(token),
