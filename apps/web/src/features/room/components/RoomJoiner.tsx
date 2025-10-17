@@ -29,6 +29,9 @@ export interface RoomJoinerProps {
   error: string | null;
   onResetError?: () => void;
   role: Role | null;
+  canLeaveRoom: boolean;
+  onLeaveRoom: () => Promise<void> | void;
+  leavingRoom: boolean;
 }
 
 function formatRole(role: Role): string {
@@ -55,6 +58,9 @@ export default function RoomJoiner({
   error,
   onResetError,
   role,
+  canLeaveRoom,
+  onLeaveRoom,
+  leavingRoom,
 }: RoomJoinerProps) {
   const [step, setStep] = useState<Step>('room');
   const [stepMessage, setStepMessage] = useState<string | null>(null);
@@ -343,6 +349,20 @@ export default function RoomJoiner({
           </Button>
         </div>
       </form>
+      {canLeaveRoom && (
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => {
+            void onLeaveRoom();
+          }}
+          loading={leavingRoom}
+          disabled={leavingRoom}
+          className="mt-4 w-full text-rose-200 hover:bg-rose-500/10 hover:text-rose-100"
+        >
+          Leave room
+        </Button>
+      )}
     </div>
   );
 }

@@ -153,6 +153,8 @@ export default function SessionPage() {
   const [pendingModeration, setPendingModeration] = useState<PendingModeration | null>(null);
   const [roomPassword, setRoomPasswordInput] = useState('');
   const [settingPassword, setSettingPassword] = useState(false);
+  const [turnServers, setTurnServers] = useState<RTCIceServer[]>([]);
+  const [leavingRoom, setLeavingRoom] = useState(false);
 
   const resetError = useCallback(() => setError(null), []);
 
@@ -167,6 +169,7 @@ export default function SessionPage() {
       setParticipants([]);
       setTargetId('');
       setParticipantId(null);
+      setTurnServers([]);
     }
   }, [authRole, token]);
 
@@ -290,6 +293,17 @@ export default function SessionPage() {
     try {
       const id = await createRoom(token, authRole);
       setRoomId(id);
+      try {
+        const join = await joinRoom(id, authRole, token);
+        setParticipants(join.participants);
+        setParticipantId(join.participantId);
+        setTurnServers(join.turn);
+        useSessionStore.getState().setRole('facilitator');
+      } catch (joinErr) {
+        console.error(joinErr);
+        setError('Failed to initialize room after creation');
+        return false;
+      }
       return true;
     } catch (err) {
       console.error(err);
@@ -324,50 +338,71 @@ export default function SessionPage() {
     }
     setConnecting(true);
     setError(null);
-    setParticipantId(null);
     const previousDisconnect = disconnectRef.current;
     disconnectRef.current = null;
     previousDisconnect?.();
     cleanupRemoteAudio();
-    let joinedParticipantId: string | null = null;
+    let nextParticipantId = participantId;
+    let currentTurn = turnServers;
+    let remoteList = participants;
+    let joinedForThisAttempt = false;
     let hasLeft = false;
     const leaveIfNeeded = () => {
-      if (hasLeft || !joinedParticipantId) {
+      if (hasLeft || !joinedForThisAttempt || !nextParticipantId) {
         return;
       }
       hasLeft = true;
-      void leaveRoom(roomId, joinedParticipantId, token).catch(() => {});
+      void leaveRoom(roomId, nextParticipantId, token).catch(() => {});
     };
     try {
-      const join = await joinRoom(roomId, authRole, token, joinPassword || undefined);
-      const remoteList = join.participants;
-      setParticipants(remoteList);
+      if (!nextParticipantId) {
+        const join = await joinRoom(roomId, authRole, token, joinPassword || undefined);
+        nextParticipantId = join.participantId;
+        currentTurn = join.turn;
+        remoteList = join.participants;
+        setParticipantId(join.participantId);
+        setParticipants(join.participants);
+        setTurnServers(join.turn);
+        joinedForThisAttempt = true;
+      } else {
+        const refreshed = await listParticipants(roomId, token);
+        remoteList = refreshed;
+        setParticipants(refreshed);
+      }
+
       const resolvedTarget = remoteList.find(p => p.id === selectedTarget.id);
-      if (!resolvedTarget || resolvedTarget.id === join.participantId) {
-        joinedParticipantId = join.participantId;
+      if (!resolvedTarget || resolvedTarget.id === nextParticipantId) {
         leaveIfNeeded();
         throw new Error('target-unavailable');
       }
-      joinedParticipantId = join.participantId;
-      setParticipantId(join.participantId);
+
+      if (!currentTurn.length) {
+        setError('Missing connection details for this room');
+        leaveIfNeeded();
+        return;
+      }
+
       const disconnect = connectWithReconnection({
         roomId,
-        participantId: join.participantId,
+        participantId: nextParticipantId,
         targetId: resolvedTarget.id,
         token,
-        turn: join.turn,
+        turn: currentTurn,
         role: authRole,
         targetRole: resolvedTarget.role,
         version: '1',
         onTrack: handleTrack,
       });
       let disconnected = false;
+      const shouldClearParticipant = joinedForThisAttempt;
       disconnectRef.current = () => {
         if (disconnected) return;
         disconnected = true;
         disconnect();
         cleanupRemoteAudio();
-        setParticipantId(null);
+        if (shouldClearParticipant) {
+          setParticipantId(null);
+        }
         useSessionStore.getState().resetRemotePresence();
         leaveIfNeeded();
         disconnectRef.current = null;
@@ -383,7 +418,62 @@ export default function SessionPage() {
     } finally {
       setConnecting(false);
     }
-  }, [authRole, cleanupRemoteAudio, handleTrack, joinPassword, participants, roomId, targetId, token]);
+  }, [
+    authRole,
+    cleanupRemoteAudio,
+    handleTrack,
+    joinPassword,
+    participantId,
+    participants,
+    roomId,
+    targetId,
+    token,
+    turnServers,
+  ]);
+
+  const handleLeaveRoom = useCallback(async () => {
+    if (!token) {
+      setError('Authentication token is missing');
+      return;
+    }
+    if (!roomId) {
+      setError('Room ID is required to leave the room');
+      return;
+    }
+    if (!participantId) {
+      setParticipants([]);
+      setTargetId('');
+      setTurnServers([]);
+      useSessionStore.getState().setRole(null);
+      return;
+    }
+    setLeavingRoom(true);
+    setError(null);
+    const currentParticipantId = participantId;
+    disconnectRef.current?.();
+    cleanupRemoteAudio();
+    const session = useSessionStore.getState();
+    session.setConnection('disconnected');
+    session.setControl(null);
+    session.setTelemetry(null);
+    session.setPeerClock(null);
+    session.setMicStream(null);
+    session.resetRemotePresence();
+    try {
+      await leaveRoom(roomId, currentParticipantId, token);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to leave room');
+    } finally {
+      setLeavingRoom(false);
+    }
+    setParticipantId(null);
+    setParticipants([]);
+    setTargetId('');
+    setTurnServers([]);
+    setPendingModeration(null);
+    session.setRole(null);
+  }, [cleanupRemoteAudio, participantId, roomId, token]);
 
   useEffect(() => {
     return () => {
@@ -446,7 +536,6 @@ export default function SessionPage() {
           setTargetId('');
           disconnectRef.current?.();
           cleanupRemoteAudio();
-          setParticipantId(null);
         }
       } catch (err) {
         console.error(err);
@@ -461,6 +550,8 @@ export default function SessionPage() {
   if (!token) {
     return <AuthForm />;
   }
+
+  const facilitatorHasRoom = effectiveRole === 'facilitator' && Boolean(participantId);
 
   const connectionPhase: SessionPhase = error
     ? 'error'
@@ -484,7 +575,9 @@ export default function SessionPage() {
       ? 'Live session'
       : connection === 'connecting' || connecting
         ? 'Negotiating link'
-        : 'Idle';
+        : facilitatorHasRoom
+          ? 'Room controls ready'
+          : 'Idle';
 
   const handleLogout = useCallback(async () => {
     disconnectRef.current?.();
@@ -529,6 +622,21 @@ export default function SessionPage() {
         />
       );
     }
+  } else if (facilitatorHasRoom) {
+    contentKey = 'role-facilitator';
+    mainContent = (
+      <FacilitatorView
+        participants={participants}
+        currentParticipantId={participantId ?? undefined}
+        selectedParticipantId={targetId || undefined}
+        selectableParticipantIds={availableTargets.map(participant => participant.id)}
+        onSelectParticipant={handleParticipantCardSelect}
+        canModerate={canModerateParticipants}
+        onChangeRole={handleParticipantRoleChange}
+        onRemoveParticipant={handleRemoveParticipant}
+        pendingModeration={pendingModeration}
+      />
+    );
   } else {
     mainContent = <IdleState />;
     contentKey = 'idle';
@@ -563,6 +671,9 @@ export default function SessionPage() {
               error={error}
               onResetError={resetError}
               role={effectiveRole}
+              canLeaveRoom={Boolean(participantId)}
+              onLeaveRoom={handleLeaveRoom}
+              leavingRoom={leavingRoom}
             />
             {canModerateParticipants ? (
               <GlassCard variant="default" className="border-white/10 bg-white/5">
