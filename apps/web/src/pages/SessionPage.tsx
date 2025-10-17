@@ -168,7 +168,7 @@ export default function SessionPage() {
       setTargetId('');
       setParticipantId(null);
     }
-  }, [token]);
+  }, [authRole, token]);
 
   const effectiveRole = useMemo<Role | null>(() => {
     if (sessionRole) return sessionRole;
@@ -281,10 +281,14 @@ export default function SessionPage() {
       setError('Authentication token is missing');
       return false;
     }
+    if (!isRole(authRole) || authRole !== 'facilitator') {
+      setError('Only facilitators can create rooms');
+      return false;
+    }
     setCreatingRoom(true);
     setError(null);
     try {
-      const id = await createRoom(token);
+      const id = await createRoom(token, authRole);
       setRoomId(id);
       return true;
     } catch (err) {
@@ -294,7 +298,7 @@ export default function SessionPage() {
     } finally {
       setCreatingRoom(false);
     }
-  }, [token]);
+  }, [authRole, token]);
 
   const handleConnect = useCallback(async () => {
     if (!token) {
