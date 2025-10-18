@@ -2,10 +2,41 @@ import { apiUrl } from '../../config';
 
 export type Role = 'facilitator' | 'explorer' | 'listener';
 
+function logError(context: string, details?: Record<string, unknown>): void {
+  if (details && Object.keys(details).length > 0) {
+    console.error(`[Session API] ${context}`, details);
+  } else {
+    console.error(`[Session API] ${context}`);
+  }
+}
+
+async function extractErrorMessage(
+  res: Response,
+  fallbackMessage: string
+): Promise<{ message: string; payload?: unknown }> {
+  try {
+    const data = await res.json();
+    const message =
+      (typeof data === 'object' && data !== null &&
+        ('message' in data || 'error' in data))
+        ? ((data as { message?: string; error?: string }).message ||
+            (data as { message?: string; error?: string }).error ||
+            fallbackMessage)
+        : fallbackMessage;
+    return { message, payload: data };
+  } catch {
+    return {
+      message: `${res.status}: ${res.statusText}` || fallbackMessage,
+    };
+  }
+}
+
 function normalizeToken(token: string): string {
   const trimmed = token.trim();
   if (!trimmed) {
-    throw new Error('Authentication token is required.');
+    const message = 'Authentication token is required.';
+    logError('Missing authentication token', { providedTokenLength: token.length });
+    throw new Error(message);
   }
   return trimmed;
 }
@@ -26,7 +57,9 @@ export interface CreateRoomResponse {
 
 export async function createRoom(token: string, role: Role = 'facilitator'): Promise<CreateRoomResponse> {
   if (role !== 'facilitator') {
-    throw new Error('Only facilitators can create rooms.');
+    const message = 'Only facilitators can create rooms.';
+    logError('Attempted to create room with non-facilitator role', { role });
+    throw new Error(message);
   }
 
   const res = await fetch(apiUrl('/rooms'), {
@@ -35,15 +68,18 @@ export async function createRoom(token: string, role: Role = 'facilitator'): Pro
   });
 
   if (!res.ok) {
-    // Try to get error details from response
-    let errorMessage = 'failed to create room';
-    try {
-      const errorData = await res.json();
-      errorMessage = errorData.message || errorData.error || errorMessage;
-    } catch {
-      // Response wasn't JSON, use status text
-      errorMessage = `${res.status}: ${res.statusText}`;
-    }
+    const { message: errorMessage, payload } = await extractErrorMessage(
+      res,
+      'failed to create room'
+    );
+    logError('Failed to create room', {
+      role,
+      status: res.status,
+      statusText: res.statusText,
+      url: res.url,
+      errorMessage,
+      errorPayload: payload,
+    });
     throw new Error(errorMessage);
   }
 
@@ -84,7 +120,23 @@ export async function joinRoom(
     headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
     body: JSON.stringify(password ? { role, password } : { role }),
   });
-  if (!res.ok) throw new Error('failed to join room');
+  if (!res.ok) {
+    const { message: errorMessage, payload } = await extractErrorMessage(
+      res,
+      'failed to join room'
+    );
+    logError('Failed to join room', {
+      roomId,
+      role,
+      hasPassword: Boolean(password),
+      status: res.status,
+      statusText: res.statusText,
+      url: res.url,
+      errorMessage,
+      errorPayload: payload,
+    });
+    throw new Error(errorMessage);
+  }
   const data = (await res.json()) as {
     participantId: string;
     turn: RTCIceServer;
@@ -113,7 +165,21 @@ export async function listParticipants(roomId: string, token: string): Promise<P
   const res = await fetch(apiUrl(`/rooms/${roomId}/participants`), {
     headers: authHeaders(token),
   });
-  if (!res.ok) throw new Error('failed to list participants');
+  if (!res.ok) {
+    const { message: errorMessage, payload } = await extractErrorMessage(
+      res,
+      'failed to list participants'
+    );
+    logError('Failed to list participants', {
+      roomId,
+      status: res.status,
+      statusText: res.statusText,
+      url: res.url,
+      errorMessage,
+      errorPayload: payload,
+    });
+    throw new Error(errorMessage);
+  }
   const data = (await res.json()) as { participants?: ParticipantSummary[] };
   return data.participants ?? [];
 }
@@ -124,7 +190,22 @@ export async function setRoomPassword(roomId: string, token: string, password?: 
     headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
     body: JSON.stringify(password ? { password } : {}),
   });
-  if (!res.ok) throw new Error('failed to set room password');
+  if (!res.ok) {
+    const { message: errorMessage, payload } = await extractErrorMessage(
+      res,
+      'failed to set room password'
+    );
+    logError('Failed to set room password', {
+      roomId,
+      hasPassword: Boolean(password),
+      status: res.status,
+      statusText: res.statusText,
+      url: res.url,
+      errorMessage,
+      errorPayload: payload,
+    });
+    throw new Error(errorMessage);
+  }
 }
 
 export async function updateParticipantRole(
@@ -138,7 +219,23 @@ export async function updateParticipantRole(
     headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
     body: JSON.stringify({ participantId, role }),
   });
-  if (!res.ok) throw new Error('failed to update participant role');
+  if (!res.ok) {
+    const { message: errorMessage, payload } = await extractErrorMessage(
+      res,
+      'failed to update participant role'
+    );
+    logError('Failed to update participant role', {
+      roomId,
+      participantId,
+      role,
+      status: res.status,
+      statusText: res.statusText,
+      url: res.url,
+      errorMessage,
+      errorPayload: payload,
+    });
+    throw new Error(errorMessage);
+  }
 }
 
 export async function removeRoomParticipant(
@@ -151,5 +248,20 @@ export async function removeRoomParticipant(
     headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
     body: JSON.stringify({ participantId }),
   });
-  if (!res.ok) throw new Error('failed to remove participant');
+  if (!res.ok) {
+    const { message: errorMessage, payload } = await extractErrorMessage(
+      res,
+      'failed to remove participant'
+    );
+    logError('Failed to remove room participant', {
+      roomId,
+      participantId,
+      status: res.status,
+      statusText: res.statusText,
+      url: res.url,
+      errorMessage,
+      errorPayload: payload,
+    });
+    throw new Error(errorMessage);
+  }
 }
