@@ -318,6 +318,14 @@ export default function DashboardPage() {
     [navigate],
   );
 
+  const handleDeleteSession = useCallback((roomId: string) => {
+    setSessions(prev => prev.filter(session => session.roomId !== roomId));
+    setPresence(prev => {
+      const { [roomId]: _removed, ...rest } = prev;
+      return rest;
+    });
+  }, []);
+
   useEffect(() => {
     if (!copiedRoomId || typeof window === 'undefined') return undefined;
     const timer = window.setTimeout(() => {
@@ -502,6 +510,9 @@ export default function DashboardPage() {
                           </Button>
                           <Button size="sm" variant="ghost" onClick={() => handleOpenSettings(session.roomId)}>
                             Settings
+                          </Button>
+                          <Button size="sm" variant="danger" onClick={() => handleDeleteSession(session.roomId)}>
+                            Delete
                           </Button>
                         </div>
                       </GlassCard>
