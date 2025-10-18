@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StatusIndicator, type StatusIndicatorStatus } from '../components/ui/status-indicator';
 import { Button } from '../components/ui/button';
+import { cn } from '../lib/utils';
 
 export interface AppLayoutProps {
   user: {
@@ -28,6 +29,8 @@ export default function AppLayout({
   children,
   onLogout,
 }: AppLayoutProps) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-slate-950">
       {/* Header */}
@@ -35,6 +38,23 @@ export default function AppLayout({
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
           {/* Left section */}
           <div className="flex items-center gap-4">
+            {sidebar && (
+              <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="rounded-lg p-2 hover:bg-white/10 lg:hidden"
+                aria-label="Toggle sidebar"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 6h16M4 12h16M4 18h16"
+                  />
+                </svg>
+              </button>
+            )}
+            
             <div>
               {title && (
                 <h1 className="text-lg font-semibold text-white">{title}</h1>
@@ -69,7 +89,7 @@ export default function AppLayout({
                 onClick={onLogout}
                 variant="ghost"
                 size="sm"
-                className="inline-flex"
+                className="hidden sm:inline-flex"
               >
                 Logout
               </Button>
@@ -78,23 +98,52 @@ export default function AppLayout({
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-6 pb-10 pt-6 lg:flex-row">
-        {sidebar ? (
+      <div className="mx-auto flex max-w-7xl">
+        {/* Sidebar */}
+        {sidebar && (
           <>
-            <aside className="order-1 w-full lg:order-1 lg:w-80 lg:flex-shrink-0 lg:self-start lg:pt-2">
-              <div className="lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-2">
+            {/* Mobile overlay */}
+            {sidebarOpen && (
+              <div
+                className="fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-sm lg:hidden"
+                onClick={() => setSidebarOpen(false)}
+              />
+            )}
+
+            {/* Sidebar content */}
+            <aside
+              className={cn(
+                'fixed inset-y-0 left-0 z-50 w-80 transform border-r border-white/10 bg-slate-950 transition-transform lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] lg:translate-x-0',
+                sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+              )}
+            >
+              <div className="h-full overflow-y-auto p-6">
+                {/* Mobile close button */}
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  className="mb-4 rounded-lg p-2 hover:bg-white/10 lg:hidden"
+                  aria-label="Close sidebar"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+
                 {sidebar}
               </div>
             </aside>
-            <main className="order-2 w-full flex-1 lg:order-2">
-              {children}
-            </main>
           </>
-        ) : (
-          <main className="w-full flex-1">
-            {children}
-          </main>
         )}
+
+        {/* Main content */}
+        <main className="flex-1 p-6">
+          {children}
+        </main>
       </div>
     </div>
   );
