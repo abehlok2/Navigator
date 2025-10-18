@@ -26,7 +26,7 @@ interface SessionState {
   lastHeartbeat: number | null;
   peerClock: PeerClock | null;
   micStream: MediaStream | null;
-  setRole: (role: Role) => void;
+  setRole: (role: Role | null) => void;
   setConnection: (status: ConnectionStatus) => void;
   setControl: (control: ControlChannel | null) => void;
   setPeerClock: (clock: PeerClock | null) => void;
