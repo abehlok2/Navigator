@@ -85,12 +85,7 @@ export default function AppLayout({
             </div>
 
             {onLogout && (
-              <Button
-                onClick={onLogout}
-                variant="ghost"
-                size="sm"
-                className="hidden sm:inline-flex"
-              >
+              <Button onClick={onLogout} variant="ghost" size="sm">
                 Logout
               </Button>
             )}
