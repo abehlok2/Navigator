@@ -1,13 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import * as Dialog from '@radix-ui/react-dialog';
-import { useNavigate } from 'react-router-dom';
-
+import { useLocation, useMatch, useNavigate } from 'react-router-dom';
 import {
   GlassCard,
   GlassCardContent,
   GlassCardDescription,
-  GlassCardFooter,
   GlassCardHeader,
   GlassCardTitle,
 } from '../components/ui/glass-card';
@@ -15,17 +12,11 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { StatusIndicator } from '../components/ui/status-indicator';
 import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import { Select } from '../components/ui/select';
-import RoomJoiner from '../features/room/components/RoomJoiner';
-import AuthForm from '../features/auth/AuthForm';
 import { useAuthStore } from '../state/auth';
 import { useSessionStore } from '../state/session';
 import {
   createRoom,
-  leaveRoom,
   listParticipants,
-  setRoomPassword,
   type ParticipantSummary,
   type Role,
 } from '../features/session/api';
@@ -33,38 +24,139 @@ import { cn } from '../lib/utils';
 
 const STORAGE_KEY = 'navigator-dashboard-sessions';
 
-const isRole = (value: string | null): value is Role =>
-  value === 'facilitator' || value === 'explorer' || value === 'listener';
+type SessionStatus = 'active' | 'scheduled' | 'ended';
 
-const normalizeRole = (value: unknown): Role | null => {
-  if (value === 'facilitator' || value === 'explorer' || value === 'listener') {
-    return value;
-  }
-  return null;
-};
-
-interface ActiveSession {
+interface StoredSession {
   roomId: string;
   label: string;
   createdAt: string;
   lastAccessed: string;
-  participantId: string | null;
-  role: Role | null;
-  passwordEnabled: boolean;
-  scenario: string | null;
-  autoRecord: boolean;
-  allowObservers: boolean;
+  status: SessionStatus;
+  scheduledFor: string | null;
 }
 
-type SessionStats = Record<string, { participants: number; online: number }>;
+interface DiscoverableSession {
+  id: string;
+  title: string;
+  description: string;
+  host: string;
+  status: SessionStatus;
+  scheduledFor: string | null;
+  allowedRoles: Role[];
+  participants: number;
+}
 
-const SCENARIO_LABELS: Record<string, string> = {
-  mission: 'Mission rehearsal',
-  workshop: 'Collaboration workshop',
-  review: 'Post-mission review',
+const PUBLIC_ROOMS: DiscoverableSession[] = [
+  {
+    id: 'orion-lounge',
+    title: 'Orion Lounge',
+    description: 'Drop in for mission planning office hours with the command team.',
+    host: 'Mission Control',
+    status: 'active',
+    scheduledFor: null,
+    allowedRoles: ['explorer', 'listener'],
+    participants: 12,
+  },
+  {
+    id: 'deep-dive-briefing',
+    title: 'Deep Dive Briefing',
+    description: 'Public rehearsal for the Europa approach sequence.',
+    host: 'Public Relations',
+    status: 'active',
+    scheduledFor: null,
+    allowedRoles: ['facilitator', 'explorer', 'listener'],
+    participants: 27,
+  },
+];
+
+const SCHEDULED_ROOMS: DiscoverableSession[] = [
+  {
+    id: 'eva-dry-run',
+    title: 'EVA Dry Run',
+    description: 'Practice the timeline for tomorrow\'s surface EVA.',
+    host: 'Suit Ops',
+    status: 'scheduled',
+    scheduledFor: new Date(Date.now() + 1000 * 60 * 60 * 5).toISOString(),
+    allowedRoles: ['facilitator', 'explorer'],
+    participants: 6,
+  },
+  {
+    id: 'media-sync',
+    title: 'Media Sync',
+    description: 'Align talking points ahead of the press availability.',
+    host: 'Outreach Team',
+    status: 'scheduled',
+    scheduledFor: new Date(Date.now() + 1000 * 60 * 60 * 26).toISOString(),
+    allowedRoles: ['listener', 'explorer'],
+    participants: 18,
+  },
+];
+
+const SESSION_STATUS_CONFIG: Record<
+  SessionStatus,
+  { indicator: 'connected' | 'connecting' | 'disconnected'; label: string }
+> = {
+  active: { indicator: 'connected', label: 'Active' },
+  scheduled: { indicator: 'connecting', label: 'Scheduled' },
+  ended: { indicator: 'disconnected', label: 'Archived' },
 };
 
-const readStoredSessions = (): ActiveSession[] => {
+const isRole = (value: string | null): value is Role =>
+  value === 'facilitator' || value === 'explorer' || value === 'listener';
+
+const formatRelativeTime = (value: string): string => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  const diff = Date.now() - date.getTime();
+  if (diff < 60_000) return 'Just now';
+  const minutes = Math.round(diff / 60_000);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  return `${days}d ago`;
+};
+
+const formatDateTime = (value: string | null): string | null => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+};
+
+const parseInviteValue = (value: string | null | undefined): string => {
+  if (!value) return '';
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  try {
+    const url = new URL(trimmed);
+    if (url.searchParams.has('invite')) {
+      return url.searchParams.get('invite')?.trim() ?? '';
+    }
+    const joinMatch = url.pathname.match(/\/?join\/([\w-]+)/i);
+    if (joinMatch) {
+      return joinMatch[1];
+    }
+    return url.pathname.replace(/\//g, '');
+  } catch {
+    const inviteMatch = trimmed.match(/invite=([\w-]+)/i);
+    if (inviteMatch) {
+      return inviteMatch[1];
+    }
+    const joinMatch = trimmed.match(/join\/([\w-]+)/i);
+    if (joinMatch) {
+      return joinMatch[1];
+    }
+    return trimmed;
+  }
+};
+
+const readStoredSessions = (): StoredSession[] => {
   if (typeof window === 'undefined') return [];
   const raw = window.localStorage.getItem(STORAGE_KEY);
   if (!raw) return [];
@@ -74,8 +166,8 @@ const readStoredSessions = (): ActiveSession[] => {
     return parsed
       .map(item => {
         if (!item || typeof item !== 'object') return null;
-        const record = item as Partial<ActiveSession> & { roomId?: string };
-        if (!record.roomId || typeof record.roomId !== 'string') return null;
+        const record = item as Partial<StoredSession> & { roomId?: string };
+        if (!record.roomId) return null;
         const now = new Date().toISOString();
         return {
           roomId: record.roomId,
@@ -85,47 +177,47 @@ const readStoredSessions = (): ActiveSession[] => {
               : `Room ${record.roomId.slice(0, 6).toUpperCase()}`,
           createdAt: typeof record.createdAt === 'string' ? record.createdAt : now,
           lastAccessed: typeof record.lastAccessed === 'string' ? record.lastAccessed : now,
-          participantId: record.participantId ?? null,
-          role: normalizeRole(record.role) ?? null,
-          passwordEnabled: Boolean(record.passwordEnabled),
-          scenario: typeof record.scenario === 'string' ? record.scenario : null,
-          autoRecord: Boolean(record.autoRecord),
-          allowObservers: Boolean(record.allowObservers),
-        } satisfies ActiveSession;
+          status: record.status === 'scheduled' || record.status === 'ended' ? record.status : 'active',
+          scheduledFor: typeof record.scheduledFor === 'string' ? record.scheduledFor : null,
+        } satisfies StoredSession;
       })
-      .filter((value): value is ActiveSession => value !== null);
+      .filter((item): item is StoredSession => item !== null);
   } catch {
     return [];
   }
 };
 
-const formatRelativeTime = (value: string): string => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
-  const diff = Date.now() - date.getTime();
-  const minutes = Math.round(diff / 60000);
-  if (minutes <= 1) return 'Just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  return `${days}d ago`;
+const avatarColor = (role: Role): string => {
+  switch (role) {
+    case 'facilitator':
+      return 'bg-violet-600';
+    case 'explorer':
+      return 'bg-sky-600';
+    case 'listener':
+      return 'bg-emerald-600';
+    default:
+      return 'bg-slate-600';
+  }
 };
 
-const formatRole = (role: Role | null): string =>
-  role ? role.charAt(0).toUpperCase() + role.slice(1) : 'Unknown';
+const getShareLink = (roomId: string): string => {
+  if (typeof window === 'undefined') return `/join/${roomId}`;
+  return `${window.location.origin}/join/${roomId}`;
+};
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { token, username, role: authRole, logout } = useAuthStore(state => ({
+  const location = useLocation();
+  const joinMatch = useMatch('/join/:roomId');
+
+  const { token, username, role: authRole } = useAuthStore(state => ({
     token: state.token,
     username: state.username,
     role: state.role,
-    logout: state.logout,
   }));
-  const { role: sessionRole, connection } = useSessionStore(state => ({
+
+  const { role: sessionRole } = useSessionStore(state => ({
     role: state.role,
-    connection: state.connection,
   }));
 
   const effectiveRole = useMemo<Role | null>(() => {
@@ -135,104 +227,87 @@ export default function DashboardPage() {
 
   const canCreateRoom = effectiveRole === 'facilitator';
 
-  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>(() => readStoredSessions());
-  const [sessionStats, setSessionStats] = useState<SessionStats>({});
+  const [sessions, setSessions] = useState<StoredSession[]>(() => readStoredSessions());
+  const [presence, setPresence] = useState<Record<string, ParticipantSummary[]>>({});
+  const [creatingRoom, setCreatingRoom] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [joinValue, setJoinValue] = useState('');
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [copiedRoomId, setCopiedRoomId] = useState<string | null>(null);
+  const [roleFilter, setRoleFilter] = useState<Role | 'all'>('all');
 
-  const upsertSession = useCallback((session: Partial<ActiveSession> & { roomId: string }) => {
-    setActiveSessions(prev => {
-      const existing = prev.find(item => item.roomId === session.roomId);
+  const inviteFromLocation = useMemo(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const inviteParam = searchParams.get('invite');
+    const matchRoomId = joinMatch?.params.roomId ?? null;
+    return parseInviteValue(matchRoomId ?? inviteParam ?? undefined);
+  }, [joinMatch, location.search]);
+
+  useEffect(() => {
+    if (inviteFromLocation && inviteFromLocation !== joinValue) {
+      setJoinValue(inviteFromLocation);
+    }
+  }, [inviteFromLocation, joinValue]);
+
+  const upsertSession = useCallback((session: Partial<StoredSession> & { roomId: string }) => {
+    setSessions(prev => {
       const now = new Date().toISOString();
-      const baseCreatedAt = existing?.createdAt ?? now;
-      const merged: ActiveSession = {
+      const existing = prev.find(item => item.roomId === session.roomId);
+      const base: StoredSession = existing ?? {
         roomId: session.roomId,
+        label: `Room ${session.roomId.slice(0, 6).toUpperCase()}`,
+        createdAt: now,
+        lastAccessed: now,
+        status: 'active',
+        scheduledFor: null,
+      };
+      const merged: StoredSession = {
+        ...base,
+        ...session,
         label:
           session.label && session.label.trim().length > 0
             ? session.label
-            : existing?.label ?? `Room ${session.roomId.slice(0, 6).toUpperCase()}`,
-        createdAt: baseCreatedAt,
-        lastAccessed: session.lastAccessed ?? existing?.lastAccessed ?? now,
-        participantId:
-          session.participantId === undefined
-            ? existing?.participantId ?? null
-            : session.participantId,
-        role:
-          session.role === undefined
-            ? existing?.role ?? null
-            : normalizeRole(session.role) ?? null,
-        passwordEnabled:
-          session.passwordEnabled === undefined
-            ? existing?.passwordEnabled ?? false
-            : session.passwordEnabled,
-        scenario:
-          session.scenario === undefined ? existing?.scenario ?? null : session.scenario ?? null,
-        autoRecord: session.autoRecord === undefined ? existing?.autoRecord ?? false : session.autoRecord,
-        allowObservers:
-          session.allowObservers === undefined ? existing?.allowObservers ?? false : session.allowObservers,
+            : base.label,
+        lastAccessed: session.lastAccessed ?? base.lastAccessed ?? now,
+        status: session.status ?? base.status,
+        scheduledFor:
+          session.scheduledFor === undefined ? base.scheduledFor : session.scheduledFor,
       };
-      const filtered = prev.filter(item => item.roomId !== session.roomId);
-      return [merged, ...filtered];
+      const rest = prev.filter(item => item.roomId !== session.roomId);
+      return [merged, ...rest];
     });
   }, []);
 
-  const removeSession = useCallback((roomId: string) => {
-    setActiveSessions(prev => prev.filter(item => item.roomId !== roomId));
-  }, []);
-
-  const touchSession = useCallback(
-    (roomId: string) => {
-      upsertSession({ roomId, lastAccessed: new Date().toISOString() });
-    },
-    [upsertSession],
-  );
-
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const payload = activeSessions.map(session => ({
-      roomId: session.roomId,
-      label: session.label,
-      createdAt: session.createdAt,
-      lastAccessed: session.lastAccessed,
-      participantId: session.participantId ?? null,
-      role: session.role ?? null,
-      passwordEnabled: session.passwordEnabled ?? false,
-      scenario: session.scenario ?? null,
-      autoRecord: session.autoRecord ?? false,
-      allowObservers: session.allowObservers ?? false,
-    }));
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  }, [activeSessions]);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+  }, [sessions]);
 
   useEffect(() => {
-    if (!token || !activeSessions.length) {
-      if (!activeSessions.length) {
-        setSessionStats({});
-      }
+    if (!token || !sessions.length) {
+      if (!sessions.length) setPresence({});
       return;
     }
     let cancelled = false;
     (async () => {
       const entries = await Promise.all(
-        activeSessions.map(async session => {
-          try {
-            const list = await listParticipants(session.roomId, token);
-            return [
-              session.roomId,
-              {
-                participants: list.length,
-                online: list.filter(participant => participant.connected).length,
-              },
-            ] as const;
-          } catch (err) {
-            console.error(err);
-            return [session.roomId, { participants: 0, online: 0 }] as const;
-          }
-        }),
+        sessions
+          .filter(session => session.status !== 'ended')
+          .map(async session => {
+            try {
+              const participants = await listParticipants(session.roomId, token);
+              return [session.roomId, participants] as const;
+            } catch (err) {
+              console.error('Failed to load participants for session', session.roomId, err);
+              return [session.roomId, []] as const;
+            }
+          }),
       );
       if (cancelled) return;
-      setSessionStats(current => {
+      setPresence(current => {
         const next = { ...current };
-        entries.forEach(([roomId, stats]) => {
-          next[roomId] = stats;
+        entries.forEach(([roomId, participants]) => {
+          next[roomId] = participants;
         });
         return next;
       });
@@ -240,440 +315,369 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeSessions, token]);
-
-  const sortedActiveSessions = useMemo(
-    () =>
-      [...activeSessions].sort((a, b) => {
-        const aTime = new Date(a.lastAccessed).getTime();
-        const bTime = new Date(b.lastAccessed).getTime();
-        return bTime - aTime;
-      }),
-    [activeSessions],
-  );
+  }, [sessions, token]);
 
   const totalParticipants = useMemo(
     () =>
-      sortedActiveSessions.reduce((acc, session) => acc + (sessionStats[session.roomId]?.participants ?? 0), 0),
-    [sessionStats, sortedActiveSessions],
+      sessions.reduce((acc, session) => {
+        const list = presence[session.roomId] ?? [];
+        return acc + list.length;
+      }, 0),
+    [presence, sessions],
   );
 
   const onlineParticipants = useMemo(
     () =>
-      sortedActiveSessions.reduce((acc, session) => acc + (sessionStats[session.roomId]?.online ?? 0), 0),
-    [sessionStats, sortedActiveSessions],
+      sessions.reduce((acc, session) => {
+        const list = presence[session.roomId] ?? [];
+        return acc + list.filter(participant => participant.connected).length;
+      }, 0),
+    [presence, sessions],
   );
 
-  const [createWizardOpen, setCreateWizardOpen] = useState(false);
-  const [joinModalOpen, setJoinModalOpen] = useState(false);
+  const activeSessions = useMemo(
+    () =>
+      [...sessions]
+        .filter(session => session.status === 'active')
+        .sort((a, b) => new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime()),
+    [sessions],
+  );
 
-  const [loggingOut, setLoggingOut] = useState(false);
+  const archivedSessions = useMemo(
+    () =>
+      sessions
+        .filter(session => session.status === 'ended')
+        .sort((a, b) => new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime()),
+    [sessions],
+  );
 
-  const handleLogout = useCallback(async () => {
-    if (loggingOut) return;
-    setLoggingOut(true);
-    try {
-      await logout();
-    } finally {
-      setLoggingOut(false);
-    }
-  }, [loggingOut, logout]);
+  const scheduledSessions = useMemo(
+    () =>
+      sessions
+        .filter(session => session.status === 'scheduled' || (!!session.scheduledFor && new Date(session.scheduledFor).getTime() > Date.now()))
+        .sort((a, b) => new Date(a.scheduledFor ?? a.createdAt).getTime() - new Date(b.scheduledFor ?? b.createdAt).getTime()),
+    [sessions],
+  );
 
-  const [wizardName, setWizardName] = useState('Room 1');
-  const [wizardTemplate, setWizardTemplate] = useState('Room');
-  const [wizardPassword, setWizardPassword] = useState('');
-  const [wizardAutoRecord, setWizardAutoRecord] = useState(true);
-  const [wizardAllowObservers, setWizardAllowObservers] = useState(false);
-  const [wizardStartNow, setWizardStartNow] = useState(true);
-  const [wizardSaving, setWizardSaving] = useState(false);
-  const [wizardError, setWizardError] = useState<string | null>(null);
-  const resetWizard = useCallback(() => {
-    setWizardName('');
-    setWizardTemplate('Room');
-    setWizardPassword('');
-    setWizardAutoRecord(true);
-    setWizardAllowObservers(false);
-    setWizardStartNow(true);
-    setWizardSaving(false);
-    setWizardError(null);
-  }, []);
+  const filteredPublicRooms = useMemo(() => {
+    if (roleFilter === 'all') return PUBLIC_ROOMS;
+    return PUBLIC_ROOMS.filter(room => room.allowedRoles.includes(roleFilter));
+  }, [roleFilter]);
 
-  const openRoomWizard = useCallback(() => {
-    resetWizard();
+  const filteredScheduledRooms = useMemo(() => {
+    const base = [...SCHEDULED_ROOMS, ...scheduledSessions.map(session => ({
+      id: session.roomId,
+      title: session.label,
+      description: 'Scheduled session created by your team.',
+      host: username ?? 'Navigator Team',
+      status: 'scheduled' as SessionStatus,
+      scheduledFor: session.scheduledFor,
+      allowedRoles: ['facilitator', 'explorer', 'listener'] as Role[],
+      participants: (presence[session.roomId] ?? []).length,
+    }))];
+    if (roleFilter === 'all') return base;
+    return base.filter(room => room.allowedRoles.includes(roleFilter));
+  }, [presence, roleFilter, scheduledSessions, username]);
+
+  const handleCreateRoom = useCallback(async () => {
     if (!canCreateRoom) {
-      setWizardError('Only facilitators can create rooms.');
-    }
-    console.log("Creating Room...");
-    setCreateWizardOpen(true);
-  }, [canCreateRoom, resetWizard]);
-
-  useEffect(() => {
-    if (createWizardOpen) return;
-    resetWizard();
-  }, [createWizardOpen, resetWizard]);
-
-  const [joinRoomId, setJoinRoomId] = useState('');
-  const [joinPassword, setJoinPassword] = useState('');
-  const [joinParticipants, setJoinParticipants] = useState<ParticipantSummary[]>([]);
-  const [joinTargetId, setJoinTargetId] = useState('');
-  const [joinLoadingParticipants, setJoinLoadingParticipants] = useState(false);
-  const [joinConnecting, setJoinConnecting] = useState(false);
-  const [joinError, setJoinError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!joinModalOpen) {
-      setJoinError(null);
-      setJoinLoadingParticipants(false);
-      setJoinConnecting(false);
-      return;
-    }
-    setJoinParticipants([]);
-  }, [joinModalOpen]);
-
-  const availableJoinTargets = useMemo(() => {
-    if (!effectiveRole) return joinParticipants;
-    switch (effectiveRole) {
-      case 'listener':
-      case 'explorer':
-        return joinParticipants.filter(participant => participant.role === 'facilitator');
-      case 'facilitator':
-        return joinParticipants.filter(participant => participant.role !== 'facilitator');
-      default:
-        return joinParticipants;
-    }
-  }, [effectiveRole, joinParticipants]);
-
-  useEffect(() => {
-    if (!availableJoinTargets.length) {
-      if (joinTargetId) setJoinTargetId('');
-      return;
-    }
-    if (!availableJoinTargets.some(participant => participant.id === joinTargetId)) {
-      setJoinTargetId(availableJoinTargets[0].id);
-    }
-  }, [availableJoinTargets, joinTargetId]);
-
-  const handleWizardStart = useCallback(async () => {
-    if (!canCreateRoom || effectiveRole !== 'facilitator') {
-      setWizardError('Only facilitators can create rooms.');
+      setCreateError('Only facilitators can create rooms.');
       return;
     }
     if (!token) {
-      setWizardError('Authentication token is missing.');
+      setCreateError('You need to be signed in to create a room.');
       return;
     }
-    setWizardSaving(true);
-    setWizardError(null);
+    setCreatingRoom(true);
+    setCreateError(null);
     try {
-      const roomId = await createRoom(token, effectiveRole);
-      if (wizardPassword.trim().length > 0) {
-        await setRoomPassword(roomId, token, wizardPassword.trim());
-      }
-      const label = wizardName.trim().length > 0 ? wizardName.trim() : `Mission Room ${roomId.slice(0, 6).toUpperCase()}`;
+      const roomId = await createRoom(token, 'facilitator');
       const now = new Date().toISOString();
+      const label = `Mission Room ${roomId.slice(0, 6).toUpperCase()}`;
       upsertSession({
         roomId,
         label,
+        createdAt: now,
         lastAccessed: now,
-        role: effectiveRole,
-        passwordEnabled: wizardPassword.trim().length > 0,
-        scenario: wizardTemplate,
-        autoRecord: wizardAutoRecord,
-        allowObservers: wizardAllowObservers,
+        status: 'active',
       });
-      setCreateWizardOpen(false);
-      setWizardName('');
-      setWizardPassword('');
-      if (wizardStartNow) {
-        navigate(`/session/${roomId}`);
+      setJoinValue(roomId);
+      setCopiedRoomId(roomId);
+      if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && navigator.clipboard) {
+        const shareLink = getShareLink(roomId);
+        void navigator.clipboard.writeText(shareLink).catch(() => {
+          // Ignore clipboard failures; the UI will still show the link.
+        });
       }
     } catch (err) {
-      console.error(err);
-      // Show the actual error message from the backend
-      const message = err instanceof Error ? err.message : 'Failed to create room';
-      setWizardError(
-        message.includes('403') || message.includes('Forbidden')
-          ? 'Permission denied. Your account may not have facilitator privileges.'
-          : message
-      );
+      console.error('Failed to create room', err);
+      setCreateError(err instanceof Error ? err.message : 'Failed to create room');
     } finally {
-      setWizardSaving(false);
+      setCreatingRoom(false);
     }
-  }, [
-    canCreateRoom,
-    effectiveRole,
-    navigate,
-    token,
-    upsertSession,
-    wizardAllowObservers,
-    wizardAutoRecord,
-    wizardName,
-    wizardPassword,
-    wizardStartNow,
-    wizardTemplate,
-  ]);
+  }, [canCreateRoom, token, upsertSession]);
 
-  const handleWizardSubmit = useCallback(
-    (event: React.FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      void handleWizardStart();
-    },
-    [handleWizardStart]
-  );
-
-  const handleJoinCreateRoom = useCallback(() => {
-    if (!canCreateRoom) {
-      setJoinError('Only facilitators can create rooms.');
-      return false;
-    }
-    setJoinModalOpen(false);
-    openRoomWizard();
-    return false;
-  }, [canCreateRoom, openRoomWizard]);
-
-  const handleRefreshParticipants = useCallback(async () => {
-    if (!token) {
-      setJoinError('Authentication token is missing.');
-      return;
-    }
-    if (!joinRoomId.trim()) {
-      setJoinError('Enter a room ID first.');
-      return;
-    }
-    setJoinLoadingParticipants(true);
-    setJoinError(null);
-    try {
-      const list = await listParticipants(joinRoomId.trim(), token);
-      setJoinParticipants(list);
-    } catch (err) {
-      console.error(err);
-      setJoinError('Failed to load participants.');
-    } finally {
-      setJoinLoadingParticipants(false);
-    }
-  }, [joinRoomId, token]);
-
-  const handleJoinConnect = useCallback(async () => {
-    if (!token) {
-      setJoinError('Authentication token is missing.');
-      return;
-    }
-    if (!joinRoomId.trim()) {
-      setJoinError('Room ID is required.');
-      return;
-    }
-    if (!joinTargetId) {
-      setJoinError('Select a participant to connect with.');
-      return;
-    }
-    const target = joinParticipants.find(participant => participant.id === joinTargetId);
-    if (!target) {
-      setJoinError('Selected participant is no longer available.');
-      return;
-    }
-    setJoinConnecting(true);
-    setJoinError(null);
-    try {
+  const handleJoin = useCallback(
+    (roomId?: string) => {
+      const value = roomId ?? parseInviteValue(joinValue);
+      if (!value) {
+        setJoinError('Enter a valid invite link or room ID.');
+        return;
+      }
+      setJoinError(null);
       const now = new Date().toISOString();
-      upsertSession({
-        roomId: joinRoomId.trim(),
-        lastAccessed: now,
-        role: effectiveRole,
-        passwordEnabled: joinPassword.trim().length > 0,
-      });
-      setJoinModalOpen(false);
-      navigate(`/session/${joinRoomId.trim()}`, {
-        state: { targetId: joinTargetId, joinPassword: joinPassword.trim() || undefined },
-      });
-    } catch (err) {
-      console.error(err);
-      setJoinError('Failed to start session.');
-    } finally {
-      setJoinConnecting(false);
-    }
-  }, [effectiveRole, joinParticipants, joinPassword, joinRoomId, joinTargetId, navigate, token, upsertSession]);
+      upsertSession({ roomId: value, lastAccessed: now, status: 'active' });
+      navigate(`/session/${value}`);
+    },
+    [joinValue, navigate, upsertSession],
+  );
 
-  const handleContinueSession = useCallback(
+  const handleArchive = useCallback(
     (roomId: string) => {
-      touchSession(roomId);
-      navigate(`/session/${roomId}`);
+      const now = new Date().toISOString();
+      upsertSession({ roomId, status: 'ended', lastAccessed: now });
     },
-    [navigate, touchSession],
+    [upsertSession],
   );
 
-  const handleLeaveSession = useCallback(
-    async (session: ActiveSession) => {
-      if (token && session.participantId) {
-        try {
-          await leaveRoom(session.roomId, session.participantId, token);
-        } catch (err) {
-          console.error(err);
-        }
-      }
-      removeSession(session.roomId);
+  const handleShareLink = useCallback((roomId: string) => {
+    const shareLink = getShareLink(roomId);
+    setCopiedRoomId(roomId);
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      void navigator.clipboard.writeText(shareLink).catch(() => {
+        // ignore clipboard errors
+      });
+    }
+  }, []);
+
+  const handleOpenSettings = useCallback(
+    (roomId: string) => {
+      navigate(`/session/${roomId}`, { state: { focus: 'settings' } });
     },
-    [removeSession, token],
+    [navigate],
   );
+
+  useEffect(() => {
+    if (!copiedRoomId || typeof window === 'undefined') return undefined;
+    const timer = window.setTimeout(() => {
+      setCopiedRoomId(null);
+    }, 2000);
+    return () => window.clearTimeout(timer);
+  }, [copiedRoomId]);
 
   const displayName = username ?? 'Navigator Operator';
-  if (!token) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 py-12">
-        <AuthForm />
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen bg-slate-950">
-      <div className="mx-auto max-w-7xl px-6 py-12">
-        {/* Header */}
-        <header className="mb-12">
-          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-4xl font-bold text-white mb-2">
-                Welcome back, {displayName.split(' ')[0]}
-              </h1>
-              <p className="text-lg text-slate-400">
-                {formatRole(effectiveRole)} • {sortedActiveSessions.length} active rooms
-              </p>
+    <div className="flex flex-1 flex-col bg-slate-950 text-white">
+      <div className="mx-auto w-full max-w-6xl px-6 py-10 space-y-10">
+        <header className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold text-white">Mission Dashboard</h1>
+            <p className="mt-2 text-base text-slate-300">
+              Welcome back, {displayName}. Manage your sessions, share invites, and discover new rooms.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-400">
+              <span>Total sessions: {sessions.length}</span>
+              <span className="hidden sm:inline">•</span>
+              <span>Participants: {totalParticipants}</span>
+              <span className="hidden sm:inline">•</span>
+              <span>Online now: {onlineParticipants}</span>
             </div>
-            <Button
-              onClick={handleLogout}
-              variant="ghost"
-              size="sm"
-              className="self-start sm:self-auto"
-              loading={loggingOut}
-            >
-              Log out
-            </Button>
           </div>
-
-          {/* Stats Grid */}
-          <div className="grid gap-6 sm:grid-cols-3 mt-8">
-            <div className="rounded-2xl bg-white/5 border border-white/10 p-6">
-              <div className="text-sm text-slate-400 mb-1">Active Rooms</div>
-              <div className="text-3xl font-bold text-white">{sortedActiveSessions.length}</div>
-            </div>
-            <div className="rounded-2xl bg-white/5 border border-white/10 p-6">
-              <div className="text-sm text-slate-400 mb-1">Total Participants</div>
-              <div className="text-3xl font-bold text-white">{totalParticipants}</div>
-            </div>
-            <div className="rounded-2xl bg-white/5 border border-white/10 p-6">
-              <div className="text-sm text-slate-400 mb-1">Currently Online</div>
-              <div className="text-3xl font-bold text-emerald-400">{onlineParticipants}</div>
-            </div>
+          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+            <Button
+              onClick={handleCreateRoom}
+              loading={creatingRoom}
+              disabled={!canCreateRoom}
+              className="w-full sm:w-auto"
+            >
+              Create Room
+            </Button>
+            <Badge variant={canCreateRoom ? 'success' : 'muted'}>
+              {canCreateRoom ? 'Facilitator access' : 'Invite-only creation'}
+            </Badge>
           </div>
         </header>
 
-        {/* Quick Actions */}
-        <section className="mb-12">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-semibold text-white">Quick Actions</h2>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <button
-              onClick={openRoomWizard}
-              className="group rounded-2xl bg-violet-600 p-8 text-left transition-all hover:bg-violet-500 hover:scale-[1.02]"
-            >
-              <div className="text-sm font-medium text-violet-200 mb-2">CREATE</div>
-              <div className="text-xl font-bold text-white mb-1">New Mission Room</div>
-              <div className="text-sm text-violet-100/80">Launch a new collaborative session</div>
-            </button>
-            <button
-              onClick={() => setJoinModalOpen(true)}
-              className="group rounded-2xl bg-white/5 border-2 border-white/10 p-8 text-left transition-all hover:bg-white/10 hover:border-white/20"
-            >
-              <div className="text-sm font-medium text-slate-400 mb-2">JOIN</div>
-              <div className="text-xl font-bold text-white mb-1">Existing Room</div>
-              <div className="text-sm text-slate-400">Connect to an active session</div>
-            </button>
-          </div>
+        <section className="grid gap-6 lg:grid-cols-3">
+          <GlassCard className="lg:col-span-2">
+            <GlassCardHeader>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <GlassCardTitle>Join with an invite</GlassCardTitle>
+                  <GlassCardDescription>
+                    Paste an invite link or room ID. Links like /join/&lt;roomId&gt; and ?invite=&lt;roomId&gt; are detected automatically.
+                  </GlassCardDescription>
+                </div>
+                <StatusIndicator status="connecting" label="Link ready" size="sm" />
+              </div>
+            </GlassCardHeader>
+            <GlassCardContent>
+              <div className="flex flex-col gap-4 md:flex-row">
+                <Input
+                  value={joinValue}
+                  onChange={event => {
+                    setJoinValue(event.target.value);
+                    setJoinError(null);
+                  }}
+                  placeholder="Paste invite URL or room ID"
+                  className="bg-white/5 text-white placeholder:text-slate-400 md:flex-1"
+                />
+                <Button onClick={() => handleJoin()} className="md:w-40">
+                  Join Room
+                </Button>
+              </div>
+              {joinError ? (
+                <p className="mt-3 text-sm text-rose-300">{joinError}</p>
+              ) : inviteFromLocation ? (
+                <p className="mt-3 text-sm text-slate-300">Invite detected for room <span className="font-semibold">{inviteFromLocation}</span>.</p>
+              ) : null}
+            </GlassCardContent>
+          </GlassCard>
+
+          <GlassCard>
+            <GlassCardHeader>
+              <GlassCardTitle>Role filter</GlassCardTitle>
+              <GlassCardDescription>See sessions that match your preferred role.</GlassCardDescription>
+            </GlassCardHeader>
+            <GlassCardContent>
+              <div className="flex flex-wrap gap-2">
+                {(['all', 'facilitator', 'explorer', 'listener'] as const).map(option => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setRoleFilter(option)}
+                    className={cn(
+                      'rounded-full px-4 py-2 text-sm font-medium transition',
+                      roleFilter === option
+                        ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/20'
+                        : 'bg-white/5 text-slate-300 hover:bg-white/10'
+                    )}
+                  >
+                    {option === 'all' ? 'All roles' : option.charAt(0).toUpperCase() + option.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </GlassCardContent>
+          </GlassCard>
         </section>
 
-        {/* Active Sessions */}
-        <section>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-semibold text-white">Your Sessions</h2>
+        {createError && (
+          <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-200">
+            {createError}
           </div>
+        )}
 
-          {sortedActiveSessions.length === 0 ? (
-            <div className="rounded-2xl border-2 border-dashed border-white/20 bg-white/5 p-12 text-center">
-              <p className="text-lg text-slate-300 mb-4">No active sessions</p>
-              <p className="text-sm text-slate-400 mb-6">Create a new room to get started</p>
-              <Button onClick={openRoomWizard} variant="primary">
-                Create Room
-              </Button>
-            </div>
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-semibold text-white">Your active sessions</h2>
+            <span className="text-sm text-slate-400">Last updated moments ago</span>
+          </div>
+          {activeSessions.length === 0 ? (
+            <GlassCard>
+              <GlassCardContent>
+                <p className="text-sm text-slate-300">
+                  No active sessions yet. Create a room to get started or join an invite link.
+                </p>
+              </GlassCardContent>
+            </GlassCard>
           ) : (
-            <div className="space-y-4">
+            <div className="grid gap-6 md:grid-cols-2">
               <AnimatePresence>
-                {sortedActiveSessions.map(session => {
-                  const stats = sessionStats[session.roomId] ?? { participants: 0, online: 0 };
-                  const isActive = stats.online > 0;
-
+                {activeSessions.map(session => {
+                  const participants = presence[session.roomId] ?? [];
+                  const online = participants.filter(participant => participant.connected).length;
+                  const shareLink = getShareLink(session.roomId);
+                  const statusConfig = SESSION_STATUS_CONFIG[session.status];
                   return (
                     <motion.div
                       key={session.roomId}
-                      initial={{ opacity: 0, y: 20 }}
+                      layout
+                      initial={{ opacity: 0, y: 16 }}
                       animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      className="rounded-2xl bg-white/5 border border-white/10 p-6 hover:bg-white/[0.07] transition-colors"
+                      exit={{ opacity: 0, y: -16 }}
+                      transition={{ duration: 0.2 }}
                     >
-                      <div className="flex items-start justify-between gap-6">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3 mb-3">
-                            <h3 className="text-lg font-semibold text-white truncate">
-                              {session.label}
-                            </h3>
-                            {isActive && (
-                              <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-medium">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                                Active
-                              </span>
+                      <GlassCard className="h-full">
+                        <GlassCardHeader className="flex flex-col gap-4">
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <GlassCardTitle>{session.label}</GlassCardTitle>
+                              <GlassCardDescription>
+                                Last opened {formatRelativeTime(session.lastAccessed)}
+                              </GlassCardDescription>
+                            </div>
+                            <StatusIndicator
+                              status={statusConfig.indicator}
+                              label={statusConfig.label}
+                              size="sm"
+                            />
+                          </div>
+                          <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
+                            <span>ID: {session.roomId}</span>
+                            <span className="hidden sm:inline">•</span>
+                            <span>Created {formatRelativeTime(session.createdAt)}</span>
+                          </div>
+                        </GlassCardHeader>
+                        <GlassCardContent className="space-y-4">
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-slate-400">Participants</p>
+                            <div className="mt-2 flex items-center gap-3">
+                              <div className="flex -space-x-2">
+                                {participants.slice(0, 5).map(participant => (
+                                  <span
+                                    key={participant.id}
+                                    className={cn(
+                                      'inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-900 text-sm font-semibold text-white shadow-lg',
+                                      avatarColor(participant.role)
+                                    )}
+                                  >
+                                    {participant.role.charAt(0).toUpperCase()}
+                                  </span>
+                                ))}
+                                {participants.length === 0 && (
+                                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-dashed border-white/30 text-xs text-slate-400">
+                                    None
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-sm text-slate-300">
+                                {participants.length} total • {online} online
+                              </div>
+                            </div>
+                          </div>
+                          <div className="rounded-xl bg-white/5 p-4 text-sm text-slate-300">
+                            <p className="font-semibold text-white">Invite link</p>
+                            <p className="mt-1 break-all text-slate-300">{shareLink}</p>
+                            {copiedRoomId === session.roomId ? (
+                              <p className="mt-2 text-sm text-emerald-300">Link copied to clipboard</p>
+                            ) : (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                className="mt-3"
+                                onClick={() => handleShareLink(session.roomId)}
+                              >
+                                Share link
+                              </Button>
                             )}
                           </div>
-
-                          <div className="flex flex-wrap gap-3 text-sm text-slate-400 mb-3">
-                            <span>Room {session.roomId.slice(0, 8)}</span>
-                            <span>•</span>
-                            <span>{stats.participants} participants</span>
-                            <span>•</span>
-                            <span>{stats.online} online</span>
-                            <span>•</span>
-                            <span>{formatRelativeTime(session.lastAccessed)}</span>
-                          </div>
-
-                          <div className="flex flex-wrap gap-2">
-                            <Badge variant="info">
-                              {SCENARIO_LABELS[session.scenario ?? ''] ?? 'Custom'}
-                            </Badge>
-                            <Badge variant={session.passwordEnabled ? 'success' : 'muted'}>
-                              {session.passwordEnabled ? 'Secured' : 'Open'}
-                            </Badge>
-                            {session.autoRecord && (
-                              <Badge variant="muted">Recording</Badge>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={() => handleContinueSession(session.roomId)}
-                            variant="primary"
-                            size="sm"
-                          >
-                            Continue
+                        </GlassCardContent>
+                        <div className="flex flex-wrap gap-2 border-t border-white/10 px-6 py-4">
+                          <Button size="sm" onClick={() => handleJoin(session.roomId)}>
+                            Join
                           </Button>
-                          <Button
-                            onClick={() => handleLeaveSession(session)}
-                            variant="ghost"
-                            size="sm"
-                          >
-                            Leave
+                          <Button size="sm" variant="secondary" onClick={() => handleShareLink(session.roomId)}>
+                            Share Link
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => handleOpenSettings(session.roomId)}>
+                            Settings
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => handleArchive(session.roomId)}>
+                            Archive
                           </Button>
                         </div>
-                      </div>
+                      </GlassCard>
                     </motion.div>
                   );
                 })}
@@ -681,178 +685,146 @@ export default function DashboardPage() {
             </div>
           )}
         </section>
-      </div>
 
-      {/* Create Room Wizard Modal - FIXED */}
-      <Dialog.Root open={createWizardOpen} onOpenChange={setCreateWizardOpen}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/95 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-          <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-2xl translate-x-[-50%] translate-y-[-50%] p-4 duration-200 focus:outline-none focus-visible:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
-            <div className="rounded-2xl bg-slate-950 shadow-2xl border border-white/10 p-8" style={{ backgroundColor: 'rgb(15, 23, 42)' }}>
-              <div className="flex items-start justify-between mb-6">
-                <div>
-                  <Dialog.Title className="text-2xl font-bold text-white mb-2">
-                    Create Mission Room
-                  </Dialog.Title>
-                  <Dialog.Description className="text-slate-400">
-                    Configure your new collaborative session
-                  </Dialog.Description>
-                </div>
-                <Dialog.Close className="rounded-lg p-2 hover:bg-white/10 transition-colors text-white">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </Dialog.Close>
-              </div>
-
-              <form onSubmit={handleWizardSubmit} className="space-y-6">
-                <div>
-                  <Label htmlFor="wizard-name" className="text-white mb-2 block">Room Name</Label>
-                  <Input
-                    id="wizard-name"
-                    value={wizardName}
-                    onChange={e => setWizardName(e.target.value)}
-                    placeholder="Europa Mission Briefing"
-                    className="bg-white/5 border-white/10 text-white"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="wizard-template" className="text-white mb-2 block">Format</Label>
-                  <Select
-                    id="wizard-template"
-                    value={wizardTemplate}
-                    onChange={e => setWizardTemplate(e.target.value)}
-                    className="bg-white/5 border-white/10 text-white"
-                  >
-                    <option value="mission">Mission Rehearsal</option>
-                    <option value="workshop">Collaboration Workshop</option>
-                    <option value="review">Post-Mission Review</option>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="wizard-password" className="text-white mb-2 block">Password (Optional)</Label>
-                  <Input
-                    id="wizard-password"
-                    type="password"
-                    value={wizardPassword}
-                    onChange={e => setWizardPassword(e.target.value)}
-                    placeholder="Leave blank for open access"
-                    className="bg-white/5 border-white/10 text-white"
-                  />
-                </div>
-
-                <div className="space-y-3">
-                  <label className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10 cursor-pointer hover:bg-white/10">
-                    <div>
-                      <div className="text-white font-medium">Auto-record sessions</div>
-                      <div className="text-sm text-slate-400">Start recording automatically</div>
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-semibold text-white">Public rooms</h2>
+            <span className="text-sm text-slate-400">Open rooms that match your filter</span>
+          </div>
+          {filteredPublicRooms.length === 0 ? (
+            <GlassCard>
+              <GlassCardContent>
+                <p className="text-sm text-slate-300">No public rooms available for the selected role.</p>
+              </GlassCardContent>
+            </GlassCard>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2">
+              {filteredPublicRooms.map(room => {
+                const statusConfig = SESSION_STATUS_CONFIG[room.status];
+                return (
+                  <GlassCard key={room.id}>
+                    <GlassCardHeader className="flex items-start justify-between gap-4">
+                      <div>
+                        <GlassCardTitle>{room.title}</GlassCardTitle>
+                        <GlassCardDescription>{room.description}</GlassCardDescription>
+                        <p className="mt-3 text-sm text-slate-300">Hosted by {room.host}</p>
+                      </div>
+                      <StatusIndicator status={statusConfig.indicator} label={statusConfig.label} size="sm" />
+                    </GlassCardHeader>
+                    <GlassCardContent className="space-y-3 text-sm text-slate-300">
+                      <p>Participants: {room.participants}</p>
+                      <p>Invite link: {getShareLink(room.id)}</p>
+                      <div className="flex flex-wrap gap-2">
+                        {room.allowedRoles.map(role => (
+                          <Badge key={role} variant="muted">
+                            {role.charAt(0).toUpperCase() + role.slice(1)}
+                          </Badge>
+                        ))}
+                      </div>
+                    </GlassCardContent>
+                    <div className="flex items-center justify-between border-t border-white/10 px-6 py-4">
+                      <span className="text-sm text-slate-400">Room ID: {room.id}</span>
+                      <Button size="sm" onClick={() => handleJoin(room.id)}>
+                        Join
+                      </Button>
                     </div>
-                    <input
-                      type="checkbox"
-                      checked={wizardAutoRecord}
-                      onChange={e => setWizardAutoRecord(e.target.checked)}
-                      className="w-5 h-5 rounded"
-                    />
-                  </label>
+                  </GlassCard>
+                );
+              })}
+            </div>
+          )}
+        </section>
 
-                  <label className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10 cursor-pointer hover:bg-white/10">
-                    <div>
-                      <div className="text-white font-medium">Allow observers</div>
-                      <div className="text-sm text-slate-400">Permit listen-only participants</div>
+        <section className="space-y-4 pb-10">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-semibold text-white">Scheduled sessions</h2>
+            <span className="text-sm text-slate-400">Plan ahead and jump in when it\'s time</span>
+          </div>
+          {filteredScheduledRooms.length === 0 ? (
+            <GlassCard>
+              <GlassCardContent>
+                <p className="text-sm text-slate-300">
+                  No scheduled sessions match your filters. Create a room and mark it as scheduled from the session settings.
+                </p>
+              </GlassCardContent>
+            </GlassCard>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2">
+              {filteredScheduledRooms.map(room => {
+                const statusConfig = SESSION_STATUS_CONFIG[room.status];
+                const scheduledTime = formatDateTime(room.scheduledFor);
+                return (
+                  <GlassCard key={room.id}>
+                    <GlassCardHeader className="flex items-start justify-between gap-4">
+                      <div>
+                        <GlassCardTitle>{room.title}</GlassCardTitle>
+                        <GlassCardDescription>{room.description}</GlassCardDescription>
+                        {scheduledTime && (
+                          <p className="mt-3 text-sm text-slate-300">Starts {scheduledTime}</p>
+                        )}
+                        <p className="mt-1 text-sm text-slate-400">Hosted by {room.host}</p>
+                      </div>
+                      <StatusIndicator status={statusConfig.indicator} label={statusConfig.label} size="sm" />
+                    </GlassCardHeader>
+                    <GlassCardContent className="space-y-3 text-sm text-slate-300">
+                      <p>Expected participants: {room.participants}</p>
+                      <div className="flex flex-wrap gap-2">
+                        {room.allowedRoles.map(role => (
+                          <Badge key={role} variant="muted">
+                            {role.charAt(0).toUpperCase() + role.slice(1)}
+                          </Badge>
+                        ))}
+                      </div>
+                    </GlassCardContent>
+                    <div className="flex items-center justify-between border-t border-white/10 px-6 py-4">
+                      <span className="text-sm text-slate-400">Room ID: {room.id}</span>
+                      <Button size="sm" variant="secondary" onClick={() => handleJoin(room.id)}>
+                        Preview
+                      </Button>
                     </div>
-                    <input
-                      type="checkbox"
-                      checked={wizardAllowObservers}
-                      onChange={e => setWizardAllowObservers(e.target.checked)}
-                      className="w-5 h-5 rounded"
-                    />
-                  </label>
+                  </GlassCard>
+                );
+              })}
+            </div>
+          )}
+        </section>
 
-                  <label className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10 cursor-pointer hover:bg-white/10">
+        {archivedSessions.length > 0 && (
+          <section className="space-y-4 pb-10">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-semibold text-white">Archived sessions</h2>
+              <span className="text-sm text-slate-400">Stored locally for quick reference</span>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              {archivedSessions.map(session => (
+                <GlassCard key={session.roomId}>
+                  <GlassCardHeader className="flex items-start justify-between gap-4">
                     <div>
-                      <div className="text-white font-medium">Start immediately</div>
-                      <div className="text-sm text-slate-400">Jump to session after creation</div>
+                      <GlassCardTitle>{session.label}</GlassCardTitle>
+                      <GlassCardDescription>
+                        Archived {formatRelativeTime(session.lastAccessed)}
+                      </GlassCardDescription>
                     </div>
-                    <input
-                      type="checkbox"
-                      checked={wizardStartNow}
-                      onChange={e => setWizardStartNow(e.target.checked)}
-                      className="w-5 h-5 rounded"
-                    />
-                  </label>
-                </div>
-
-                {wizardError && (
-                  <div className="p-4 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300">
-                    {wizardError}
-                  </div>
-                )}
-
-                <div className="flex gap-3 pt-4">
-                  <Button
-                    type="submit"
-                    loading={wizardSaving}
-                    variant="primary"
-                    className="flex-1"
-                    disabled={!canCreateRoom}
-                  >
-                    Create Room
-                  </Button>
-                  <Dialog.Close asChild>
-                    <Button type="button" variant="ghost" className="flex-1">
-                      Cancel
+                    <StatusIndicator status="disconnected" label="Archived" size="sm" />
+                  </GlassCardHeader>
+                  <GlassCardContent className="space-y-2 text-sm text-slate-300">
+                    <p>Room ID: {session.roomId}</p>
+                    <p>Created {formatRelativeTime(session.createdAt)}</p>
+                  </GlassCardContent>
+                  <div className="flex gap-2 border-t border-white/10 px-6 py-4">
+                    <Button size="sm" variant="ghost" onClick={() => handleJoin(session.roomId)}>
+                      Reopen
                     </Button>
-                  </Dialog.Close>
-                </div>
-              </form>
+                    <Button size="sm" variant="ghost" onClick={() => handleShareLink(session.roomId)}>
+                      Share
+                    </Button>
+                  </div>
+                </GlassCard>
+              ))}
             </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
-
-      {/* Join Room Modal - FIXED */}
-      <Dialog.Root open={joinModalOpen} onOpenChange={setJoinModalOpen}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/95 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-          <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-2xl translate-x-[-50%] translate-y-[-50%] p-4 duration-200 focus:outline-none focus-visible:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
-            <Dialog.Title className="sr-only">Join Room</Dialog.Title>
-            <Dialog.Description className="sr-only">Connect to an existing session</Dialog.Description>
-            <div className="relative w-full">
-              <Dialog.Close asChild>
-                <button className="absolute right-5 top-5 z-10 rounded-lg p-2 text-white hover:bg-white/10">
-                  <span className="sr-only">Close</span>
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </Dialog.Close>
-              <RoomJoiner
-                roomId={joinRoomId}
-                onRoomIdChange={setJoinRoomId}
-                canCreateRoom={canCreateRoom}
-                creatingRoom={false}
-                onCreateRoom={handleJoinCreateRoom}
-                joinPassword={joinPassword}
-                onJoinPasswordChange={setJoinPassword}
-                participants={joinParticipants}
-                availableTargets={availableJoinTargets}
-                loadingParticipants={joinLoadingParticipants}
-                onRefreshParticipants={handleRefreshParticipants}
-                targetId={joinTargetId}
-                onTargetChange={setJoinTargetId}
-                onConnect={handleJoinConnect}
-                connecting={joinConnecting}
-                participantId={null}
-                error={joinError}
-                onResetError={() => setJoinError(null)}
-                role={effectiveRole}
-              />
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+          </section>
+        )}
+      </div>
     </div>
   );
 }

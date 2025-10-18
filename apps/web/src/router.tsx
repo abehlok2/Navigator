@@ -9,6 +9,7 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<DashboardPage />} />
+      <Route path="/join/:roomId" element={<DashboardPage />} />
       <Route path="/session/:roomId" element={<SessionPage />} />
       <Route path="/auth" element={<AuthForm />} />
       <Route path="*" element={<NotFoundPage />} />
