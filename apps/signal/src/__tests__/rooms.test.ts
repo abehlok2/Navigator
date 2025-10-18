@@ -20,35 +20,42 @@ describe('rooms', () => {
     const { createRoom, addParticipant, listParticipants } = await import('../rooms.ts');
     const room = createRoom('room1');
     addParticipant(room.id, 'explorer');
-    expect(listParticipants(room.id)).toHaveLength(1);
+    expect(listParticipants(room.id)).toHaveLength(2);
   });
 
   it('enforces single facilitator and explorer per room', async () => {
     const { createRoom, addParticipant } = await import('../rooms.ts');
     const room = createRoom('room-limits');
-    addParticipant(room.id, 'facilitator');
     expect(() => addParticipant(room.id, 'facilitator')).toThrowError('facilitator already present');
     addParticipant(room.id, 'explorer');
     expect(() => addParticipant(room.id, 'explorer')).toThrowError('explorer already present');
   });
 
   it('prevents role reassignment when slot is taken', async () => {
-    const { createRoom, addParticipant, setRole } = await import('../rooms.ts');
+    const { createRoom, addParticipant, setRole, getFacilitator } = await import('../rooms.ts');
     const room = createRoom('room-role-change');
-    const facilitator = addParticipant(room.id, 'facilitator');
+    const facilitator = getFacilitator(room.id)!;
     const listener = addParticipant(room.id, 'listener');
     expect(() => setRole(room.id, listener.id, 'facilitator')).toThrowError('facilitator already present');
     expect(() => setRole(room.id, facilitator.id, 'explorer')).not.toThrow();
   });
 
   it('cleans up inactive participants', async () => {
-    const { createRoom, addParticipant, listParticipants, getParticipant, cleanupInactiveParticipants } = await import('../rooms.ts');
+    const {
+      createRoom,
+      addParticipant,
+      listParticipants,
+      getParticipant,
+      cleanupInactiveParticipants,
+      getFacilitator,
+    } = await import('../rooms.ts');
     const room = createRoom('room1');
     const participant = addParticipant(room.id, 'explorer');
     const p = getParticipant(room.id, participant.id)!;
     p.lastActive = Date.now() - 60 * 60 * 1000; // 1 hour ago
     cleanupInactiveParticipants(30 * 60 * 1000); // 30 minutes
-    expect(listParticipants(room.id)).toHaveLength(0);
+    const facilitator = getFacilitator(room.id)!;
+    expect(listParticipants(room.id)).toEqual([facilitator]);
   });
 
   it('sets and verifies password', async () => {
@@ -90,15 +97,9 @@ describe('rooms', () => {
   });
 
   it('closes the room when the facilitator leaves', async () => {
-    const {
-      createRoom,
-      addParticipant,
-      attachSocket,
-      removeParticipant,
-      getRoom,
-    } = await import('../rooms.ts');
+    const { createRoom, addParticipant, attachSocket, removeParticipant, getRoom, getFacilitator } = await import('../rooms.ts');
     const room = createRoom('room-close');
-    const facilitator = addParticipant(room.id, 'facilitator');
+    const facilitator = getFacilitator(room.id)!;
     const listener = addParticipant(room.id, 'listener');
     const explorer = addParticipant(room.id, 'explorer');
 

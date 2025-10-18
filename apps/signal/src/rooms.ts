@@ -63,7 +63,13 @@ function passwordsMatch(password: string, storedHash: string): boolean {
 
 const storedRooms = await loadRooms();
 let migratedLegacyPasswords = false;
+let removedEmptyRooms = false;
 for (const room of Object.values(storedRooms)) {
+  if (!room.participants?.length) {
+    delete storedRooms[room.id];
+    removedEmptyRooms = true;
+    continue;
+  }
   let passwordHash = room.passwordHash;
   if (!passwordHash && room.password) {
     passwordHash = hashPassword(room.password);
@@ -80,7 +86,7 @@ for (const room of Object.values(storedRooms)) {
   });
 }
 
-if (migratedLegacyPasswords) {
+if (migratedLegacyPasswords || removedEmptyRooms) {
   persist();
 }
 
@@ -98,6 +104,8 @@ function persist() {
 
 export function createRoom(id: string = randomUUID()): Room {
   const room: Room = { id, participants: new Map() };
+  const facilitator: Participant = { id: randomUUID(), role: 'facilitator', lastActive: Date.now() };
+  room.participants.set(facilitator.id, facilitator);
   rooms.set(id, room);
   persist();
   return room;
@@ -105,6 +113,17 @@ export function createRoom(id: string = randomUUID()): Room {
 
 export function getRoom(id: string): Room | undefined {
   return rooms.get(id);
+}
+
+export function getFacilitator(roomId: string): Participant | undefined {
+  const room = rooms.get(roomId);
+  if (!room) return undefined;
+  for (const participant of room.participants.values()) {
+    if (participant.role === 'facilitator') {
+      return participant;
+    }
+  }
+  return undefined;
 }
 
 export function addParticipant(roomId: string, role: Role): Participant {
@@ -135,7 +154,7 @@ export function removeParticipant(roomId: string, participantId: string): void {
   participant.ws?.close();
   const wasFacilitator = participant.role === 'facilitator';
   room.participants.delete(participantId);
-  if (wasFacilitator) {
+  if (wasFacilitator || room.participants.size === 0) {
     destroyRoom(roomId);
     return;
   }
@@ -203,13 +222,22 @@ export function touchParticipant(roomId: string, participantId: string): void {
 export function cleanupInactiveParticipants(timeoutMs: number): void {
   const now = Date.now();
   let changed = false;
-  rooms.forEach(room => {
+  const roomsToDestroy: string[] = [];
+  rooms.forEach((room, roomId) => {
     for (const [id, participant] of room.participants) {
       if (now - participant.lastActive > timeoutMs) {
+        participant.ws?.close();
         room.participants.delete(id);
+        if (participant.role === 'facilitator' || room.participants.size === 0) {
+          roomsToDestroy.push(roomId);
+          break;
+        }
         changed = true;
       }
     }
+  });
+  roomsToDestroy.forEach(roomId => {
+    destroyRoom(roomId);
   });
   if (changed) persist();
 }

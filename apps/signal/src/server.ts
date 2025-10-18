@@ -21,6 +21,7 @@ import {
   removeParticipant,
   setRole,
   getRoom,
+  getFacilitator,
   attachSocket,
   getParticipant,
   listParticipants,
@@ -146,9 +147,19 @@ app.post('/logout', authMiddleware(), (req, res) => {
   res.sendStatus(204);
 });
 
-app.post('/rooms', authMiddleware('facilitator'), (_req, res) => {
+app.post('/rooms', authMiddleware('facilitator'), (req, res) => {
   const room = createRoom();
-  res.json({ roomId: room.id });
+  const facilitator = getFacilitator(room.id);
+  if (!facilitator) {
+    res.status(500).json({ error: 'failed to initialize facilitator' });
+    return;
+  }
+  const participants = listParticipants(room.id).map(p => ({
+    id: p.id,
+    role: p.role,
+    connected: Boolean(p.ws),
+  }));
+  res.json({ roomId: room.id, participantId: facilitator.id, participants, turn: TURN_CONFIG });
 });
 
 const joinBody = z.object({ role: roleSchema, password: z.string().optional() });
