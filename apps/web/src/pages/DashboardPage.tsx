@@ -449,10 +449,10 @@ export default function DashboardPage() {
                             <span>Created {formatRelativeTime(session.createdAt)}</span>
                           </div>
                         </GlassCardHeader>
-                        <GlassCardContent className="space-y-4">
-                          <div>
+                        <GlassCardContent className="space-y-5">
+                          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                             <p className="text-xs uppercase tracking-wide text-slate-400">Participants</p>
-                            <div className="mt-2 flex items-center gap-3">
+                            <div className="mt-3 flex items-center gap-3">
                               <div className="flex -space-x-2">
                                 {participants.slice(0, 5).map(participant => (
                                   <span
@@ -476,11 +476,11 @@ export default function DashboardPage() {
                               </div>
                             </div>
                           </div>
-                          <div className="rounded-xl bg-white/5 p-4 text-sm text-slate-300">
+                          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
                             <p className="font-semibold text-white">Invite link</p>
                             <p className="mt-1 break-all text-slate-300">{shareLink}</p>
                             {copiedRoomId === session.roomId ? (
-                              <p className="mt-2 text-sm text-emerald-300">Link copied to clipboard</p>
+                              <p className="mt-3 text-sm text-emerald-300">Link copied to clipboard</p>
                             ) : (
                               <Button
                                 variant="secondary"
