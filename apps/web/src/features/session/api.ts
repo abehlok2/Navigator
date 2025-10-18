@@ -17,7 +17,14 @@ function authHeaders(token: string): HeadersInit {
   };
 }
 
-export async function createRoom(token: string, role: Role = 'facilitator'): Promise<string> {
+export interface CreateRoomResponse {
+  roomId: string;
+  participantId: string;
+  participants: ParticipantSummary[];
+  turn: RTCIceServer[];
+}
+
+export async function createRoom(token: string, role: Role = 'facilitator'): Promise<CreateRoomResponse> {
   if (role !== 'facilitator') {
     throw new Error('Only facilitators can create rooms.');
   }
@@ -40,8 +47,18 @@ export async function createRoom(token: string, role: Role = 'facilitator'): Pro
     throw new Error(errorMessage);
   }
 
-  const data = (await res.json()) as { roomId: string };
-  return data.roomId;
+  const data = (await res.json()) as {
+    roomId: string;
+    participantId: string;
+    participants?: ParticipantSummary[];
+    turn: RTCIceServer;
+  };
+  return {
+    roomId: data.roomId,
+    participantId: data.participantId,
+    participants: data.participants ?? [],
+    turn: [data.turn],
+  };
 }
 
 export interface ParticipantSummary {

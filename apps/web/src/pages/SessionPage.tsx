@@ -1136,19 +1136,12 @@ export default function SessionPage() {
     setCreatingRoom(true);
     setError(null);
     try {
-      const id = await createRoom(token, authRole);
-      setRoomId(id);
-      try {
-        const join = await joinRoom(id, authRole, token);
-        setParticipants(join.participants);
-        setParticipantId(join.participantId);
-        setTurnServers(join.turn);
-        useSessionStore.getState().setRole('facilitator');
-      } catch (joinErr) {
-        console.error(joinErr);
-        setError('Failed to initialize room after creation');
-        return false;
-      }
+      const created = await createRoom(token, authRole);
+      setRoomId(created.roomId);
+      setParticipants(created.participants);
+      setParticipantId(created.participantId);
+      setTurnServers(created.turn);
+      useSessionStore.getState().setRole('facilitator');
       return true;
     } catch (err) {
       console.error(err);

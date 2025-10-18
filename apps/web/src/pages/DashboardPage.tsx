@@ -14,92 +14,17 @@ import { StatusIndicator } from '../components/ui/status-indicator';
 import { Input } from '../components/ui/input';
 import { useAuthStore } from '../state/auth';
 import { useSessionStore } from '../state/session';
-import {
-  createRoom,
-  listParticipants,
-  type ParticipantSummary,
-  type Role,
-} from '../features/session/api';
+import { createRoom, listParticipants, type ParticipantSummary, type Role } from '../features/session/api';
 import { cn } from '../lib/utils';
 
 const STORAGE_KEY = 'navigator-dashboard-sessions';
-
-type SessionStatus = 'active' | 'scheduled' | 'ended';
 
 interface StoredSession {
   roomId: string;
   label: string;
   createdAt: string;
   lastAccessed: string;
-  status: SessionStatus;
-  scheduledFor: string | null;
 }
-
-interface DiscoverableSession {
-  id: string;
-  title: string;
-  description: string;
-  host: string;
-  status: SessionStatus;
-  scheduledFor: string | null;
-  allowedRoles: Role[];
-  participants: number;
-}
-
-const PUBLIC_ROOMS: DiscoverableSession[] = [
-  {
-    id: 'orion-lounge',
-    title: 'Orion Lounge',
-    description: 'Drop in for mission planning office hours with the command team.',
-    host: 'Mission Control',
-    status: 'active',
-    scheduledFor: null,
-    allowedRoles: ['explorer', 'listener'],
-    participants: 12,
-  },
-  {
-    id: 'deep-dive-briefing',
-    title: 'Deep Dive Briefing',
-    description: 'Public rehearsal for the Europa approach sequence.',
-    host: 'Public Relations',
-    status: 'active',
-    scheduledFor: null,
-    allowedRoles: ['facilitator', 'explorer', 'listener'],
-    participants: 27,
-  },
-];
-
-const SCHEDULED_ROOMS: DiscoverableSession[] = [
-  {
-    id: 'eva-dry-run',
-    title: 'EVA Dry Run',
-    description: 'Practice the timeline for tomorrow\'s surface EVA.',
-    host: 'Suit Ops',
-    status: 'scheduled',
-    scheduledFor: new Date(Date.now() + 1000 * 60 * 60 * 5).toISOString(),
-    allowedRoles: ['facilitator', 'explorer'],
-    participants: 6,
-  },
-  {
-    id: 'media-sync',
-    title: 'Media Sync',
-    description: 'Align talking points ahead of the press availability.',
-    host: 'Outreach Team',
-    status: 'scheduled',
-    scheduledFor: new Date(Date.now() + 1000 * 60 * 60 * 26).toISOString(),
-    allowedRoles: ['listener', 'explorer'],
-    participants: 18,
-  },
-];
-
-const SESSION_STATUS_CONFIG: Record<
-  SessionStatus,
-  { indicator: 'connected' | 'connecting' | 'disconnected'; label: string }
-> = {
-  active: { indicator: 'connected', label: 'Active' },
-  scheduled: { indicator: 'connecting', label: 'Scheduled' },
-  ended: { indicator: 'disconnected', label: 'Archived' },
-};
 
 const isRole = (value: string | null): value is Role =>
   value === 'facilitator' || value === 'explorer' || value === 'listener';
@@ -115,18 +40,6 @@ const formatRelativeTime = (value: string): string => {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.round(hours / 24);
   return `${days}d ago`;
-};
-
-const formatDateTime = (value: string | null): string | null => {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
 };
 
 const parseInviteValue = (value: string | null | undefined): string => {
@@ -166,8 +79,9 @@ const readStoredSessions = (): StoredSession[] => {
     return parsed
       .map(item => {
         if (!item || typeof item !== 'object') return null;
-        const record = item as Partial<StoredSession> & { roomId?: string };
+        const record = item as Partial<StoredSession> & { roomId?: string; status?: string };
         if (!record.roomId) return null;
+        if (record.status === 'ended') return null;
         const now = new Date().toISOString();
         return {
           roomId: record.roomId,
@@ -177,8 +91,6 @@ const readStoredSessions = (): StoredSession[] => {
               : `Room ${record.roomId.slice(0, 6).toUpperCase()}`,
           createdAt: typeof record.createdAt === 'string' ? record.createdAt : now,
           lastAccessed: typeof record.lastAccessed === 'string' ? record.lastAccessed : now,
-          status: record.status === 'scheduled' || record.status === 'ended' ? record.status : 'active',
-          scheduledFor: typeof record.scheduledFor === 'string' ? record.scheduledFor : null,
         } satisfies StoredSession;
       })
       .filter((item): item is StoredSession => item !== null);
@@ -234,7 +146,7 @@ export default function DashboardPage() {
   const [joinValue, setJoinValue] = useState('');
   const [joinError, setJoinError] = useState<string | null>(null);
   const [copiedRoomId, setCopiedRoomId] = useState<string | null>(null);
-  const [roleFilter, setRoleFilter] = useState<Role | 'all'>('all');
+  
 
   const inviteFromLocation = useMemo(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -258,8 +170,6 @@ export default function DashboardPage() {
         label: `Room ${session.roomId.slice(0, 6).toUpperCase()}`,
         createdAt: now,
         lastAccessed: now,
-        status: 'active',
-        scheduledFor: null,
       };
       const merged: StoredSession = {
         ...base,
@@ -269,9 +179,6 @@ export default function DashboardPage() {
             ? session.label
             : base.label,
         lastAccessed: session.lastAccessed ?? base.lastAccessed ?? now,
-        status: session.status ?? base.status,
-        scheduledFor:
-          session.scheduledFor === undefined ? base.scheduledFor : session.scheduledFor,
       };
       const rest = prev.filter(item => item.roomId !== session.roomId);
       return [merged, ...rest];
@@ -291,17 +198,15 @@ export default function DashboardPage() {
     let cancelled = false;
     (async () => {
       const entries = await Promise.all(
-        sessions
-          .filter(session => session.status !== 'ended')
-          .map(async session => {
-            try {
-              const participants = await listParticipants(session.roomId, token);
-              return [session.roomId, participants] as const;
-            } catch (err) {
-              console.error('Failed to load participants for session', session.roomId, err);
-              return [session.roomId, []] as const;
-            }
-          }),
+        sessions.map(async session => {
+          try {
+            const participants = await listParticipants(session.roomId, token);
+            return [session.roomId, participants] as const;
+          } catch (err) {
+            console.error('Failed to load participants for session', session.roomId, err);
+            return [session.roomId, []] as const;
+          }
+        }),
       );
       if (cancelled) return;
       setPresence(current => {
@@ -337,47 +242,11 @@ export default function DashboardPage() {
 
   const activeSessions = useMemo(
     () =>
-      [...sessions]
-        .filter(session => session.status === 'active')
-        .sort((a, b) => new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime()),
+      [...sessions].sort(
+        (a, b) => new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime(),
+      ),
     [sessions],
   );
-
-  const archivedSessions = useMemo(
-    () =>
-      sessions
-        .filter(session => session.status === 'ended')
-        .sort((a, b) => new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime()),
-    [sessions],
-  );
-
-  const scheduledSessions = useMemo(
-    () =>
-      sessions
-        .filter(session => session.status === 'scheduled' || (!!session.scheduledFor && new Date(session.scheduledFor).getTime() > Date.now()))
-        .sort((a, b) => new Date(a.scheduledFor ?? a.createdAt).getTime() - new Date(b.scheduledFor ?? b.createdAt).getTime()),
-    [sessions],
-  );
-
-  const filteredPublicRooms = useMemo(() => {
-    if (roleFilter === 'all') return PUBLIC_ROOMS;
-    return PUBLIC_ROOMS.filter(room => room.allowedRoles.includes(roleFilter));
-  }, [roleFilter]);
-
-  const filteredScheduledRooms = useMemo(() => {
-    const base = [...SCHEDULED_ROOMS, ...scheduledSessions.map(session => ({
-      id: session.roomId,
-      title: session.label,
-      description: 'Scheduled session created by your team.',
-      host: username ?? 'Navigator Team',
-      status: 'scheduled' as SessionStatus,
-      scheduledFor: session.scheduledFor,
-      allowedRoles: ['facilitator', 'explorer', 'listener'] as Role[],
-      participants: (presence[session.roomId] ?? []).length,
-    }))];
-    if (roleFilter === 'all') return base;
-    return base.filter(room => room.allowedRoles.includes(roleFilter));
-  }, [presence, roleFilter, scheduledSessions, username]);
 
   const handleCreateRoom = useCallback(async () => {
     if (!canCreateRoom) {
@@ -391,7 +260,8 @@ export default function DashboardPage() {
     setCreatingRoom(true);
     setCreateError(null);
     try {
-      const roomId = await createRoom(token, 'facilitator');
+      const created = await createRoom(token, 'facilitator');
+      const roomId = created.roomId;
       const now = new Date().toISOString();
       const label = `Mission Room ${roomId.slice(0, 6).toUpperCase()}`;
       upsertSession({
@@ -399,7 +269,6 @@ export default function DashboardPage() {
         label,
         createdAt: now,
         lastAccessed: now,
-        status: 'active',
       });
       setJoinValue(roomId);
       setCopiedRoomId(roomId);
@@ -426,18 +295,10 @@ export default function DashboardPage() {
       }
       setJoinError(null);
       const now = new Date().toISOString();
-      upsertSession({ roomId: value, lastAccessed: now, status: 'active' });
+      upsertSession({ roomId: value, lastAccessed: now });
       navigate(`/session/${value}`);
     },
     [joinValue, navigate, upsertSession],
-  );
-
-  const handleArchive = useCallback(
-    (roomId: string) => {
-      const now = new Date().toISOString();
-      upsertSession({ roomId, status: 'ended', lastAccessed: now });
-    },
-    [upsertSession],
   );
 
   const handleShareLink = useCallback((roomId: string) => {
@@ -474,7 +335,7 @@ export default function DashboardPage() {
           <div>
             <h1 className="text-3xl font-semibold text-white">Mission Dashboard</h1>
             <p className="mt-2 text-base text-slate-300">
-              Welcome back, {displayName}. Manage your sessions, share invites, and discover new rooms.
+              Welcome back, {displayName}. Manage your sessions and share invites.
             </p>
             <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-400">
               <span>Total sessions: {sessions.length}</span>
@@ -499,8 +360,8 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        <section className="grid gap-6 lg:grid-cols-3">
-          <GlassCard className="lg:col-span-2">
+        <section className="grid gap-6">
+          <GlassCard>
             <GlassCardHeader>
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -534,32 +395,6 @@ export default function DashboardPage() {
               ) : null}
             </GlassCardContent>
           </GlassCard>
-
-          <GlassCard>
-            <GlassCardHeader>
-              <GlassCardTitle>Role filter</GlassCardTitle>
-              <GlassCardDescription>See sessions that match your preferred role.</GlassCardDescription>
-            </GlassCardHeader>
-            <GlassCardContent>
-              <div className="flex flex-wrap gap-2">
-                {(['all', 'facilitator', 'explorer', 'listener'] as const).map(option => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => setRoleFilter(option)}
-                    className={cn(
-                      'rounded-full px-4 py-2 text-sm font-medium transition',
-                      roleFilter === option
-                        ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/20'
-                        : 'bg-white/5 text-slate-300 hover:bg-white/10'
-                    )}
-                  >
-                    {option === 'all' ? 'All roles' : option.charAt(0).toUpperCase() + option.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </GlassCardContent>
-          </GlassCard>
         </section>
 
         {createError && (
@@ -588,7 +423,6 @@ export default function DashboardPage() {
                   const participants = presence[session.roomId] ?? [];
                   const online = participants.filter(participant => participant.connected).length;
                   const shareLink = getShareLink(session.roomId);
-                  const statusConfig = SESSION_STATUS_CONFIG[session.status];
                   return (
                     <motion.div
                       key={session.roomId}
@@ -607,11 +441,7 @@ export default function DashboardPage() {
                                 Last opened {formatRelativeTime(session.lastAccessed)}
                               </GlassCardDescription>
                             </div>
-                            <StatusIndicator
-                              status={statusConfig.indicator}
-                              label={statusConfig.label}
-                              size="sm"
-                            />
+                            <StatusIndicator status="connected" label="Active" size="sm" />
                           </div>
                           <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
                             <span>ID: {session.roomId}</span>
@@ -673,9 +503,6 @@ export default function DashboardPage() {
                           <Button size="sm" variant="ghost" onClick={() => handleOpenSettings(session.roomId)}>
                             Settings
                           </Button>
-                          <Button size="sm" variant="ghost" onClick={() => handleArchive(session.roomId)}>
-                            Archive
-                          </Button>
                         </div>
                       </GlassCard>
                     </motion.div>
@@ -686,144 +513,12 @@ export default function DashboardPage() {
           )}
         </section>
 
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-semibold text-white">Public rooms</h2>
-            <span className="text-sm text-slate-400">Open rooms that match your filter</span>
-          </div>
-          {filteredPublicRooms.length === 0 ? (
-            <GlassCard>
-              <GlassCardContent>
-                <p className="text-sm text-slate-300">No public rooms available for the selected role.</p>
-              </GlassCardContent>
-            </GlassCard>
-          ) : (
-            <div className="grid gap-6 md:grid-cols-2">
-              {filteredPublicRooms.map(room => {
-                const statusConfig = SESSION_STATUS_CONFIG[room.status];
-                return (
-                  <GlassCard key={room.id}>
-                    <GlassCardHeader className="flex items-start justify-between gap-4">
-                      <div>
-                        <GlassCardTitle>{room.title}</GlassCardTitle>
-                        <GlassCardDescription>{room.description}</GlassCardDescription>
-                        <p className="mt-3 text-sm text-slate-300">Hosted by {room.host}</p>
-                      </div>
-                      <StatusIndicator status={statusConfig.indicator} label={statusConfig.label} size="sm" />
-                    </GlassCardHeader>
-                    <GlassCardContent className="space-y-3 text-sm text-slate-300">
-                      <p>Participants: {room.participants}</p>
-                      <p>Invite link: {getShareLink(room.id)}</p>
-                      <div className="flex flex-wrap gap-2">
-                        {room.allowedRoles.map(role => (
-                          <Badge key={role} variant="muted">
-                            {role.charAt(0).toUpperCase() + role.slice(1)}
-                          </Badge>
-                        ))}
-                      </div>
-                    </GlassCardContent>
-                    <div className="flex items-center justify-between border-t border-white/10 px-6 py-4">
-                      <span className="text-sm text-slate-400">Room ID: {room.id}</span>
-                      <Button size="sm" onClick={() => handleJoin(room.id)}>
-                        Join
-                      </Button>
-                    </div>
-                  </GlassCard>
-                );
-              })}
-            </div>
-          )}
-        </section>
 
-        <section className="space-y-4 pb-10">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-semibold text-white">Scheduled sessions</h2>
-            <span className="text-sm text-slate-400">Plan ahead and jump in when it\'s time</span>
-          </div>
-          {filteredScheduledRooms.length === 0 ? (
-            <GlassCard>
-              <GlassCardContent>
-                <p className="text-sm text-slate-300">
-                  No scheduled sessions match your filters. Create a room and mark it as scheduled from the session settings.
-                </p>
-              </GlassCardContent>
-            </GlassCard>
-          ) : (
-            <div className="grid gap-6 md:grid-cols-2">
-              {filteredScheduledRooms.map(room => {
-                const statusConfig = SESSION_STATUS_CONFIG[room.status];
-                const scheduledTime = formatDateTime(room.scheduledFor);
-                return (
-                  <GlassCard key={room.id}>
-                    <GlassCardHeader className="flex items-start justify-between gap-4">
-                      <div>
-                        <GlassCardTitle>{room.title}</GlassCardTitle>
-                        <GlassCardDescription>{room.description}</GlassCardDescription>
-                        {scheduledTime && (
-                          <p className="mt-3 text-sm text-slate-300">Starts {scheduledTime}</p>
-                        )}
-                        <p className="mt-1 text-sm text-slate-400">Hosted by {room.host}</p>
-                      </div>
-                      <StatusIndicator status={statusConfig.indicator} label={statusConfig.label} size="sm" />
-                    </GlassCardHeader>
-                    <GlassCardContent className="space-y-3 text-sm text-slate-300">
-                      <p>Expected participants: {room.participants}</p>
-                      <div className="flex flex-wrap gap-2">
-                        {room.allowedRoles.map(role => (
-                          <Badge key={role} variant="muted">
-                            {role.charAt(0).toUpperCase() + role.slice(1)}
-                          </Badge>
-                        ))}
-                      </div>
-                    </GlassCardContent>
-                    <div className="flex items-center justify-between border-t border-white/10 px-6 py-4">
-                      <span className="text-sm text-slate-400">Room ID: {room.id}</span>
-                      <Button size="sm" variant="secondary" onClick={() => handleJoin(room.id)}>
-                        Preview
-                      </Button>
-                    </div>
-                  </GlassCard>
-                );
-              })}
-            </div>
-          )}
-        </section>
 
-        {archivedSessions.length > 0 && (
-          <section className="space-y-4 pb-10">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-semibold text-white">Archived sessions</h2>
-              <span className="text-sm text-slate-400">Stored locally for quick reference</span>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              {archivedSessions.map(session => (
-                <GlassCard key={session.roomId}>
-                  <GlassCardHeader className="flex items-start justify-between gap-4">
-                    <div>
-                      <GlassCardTitle>{session.label}</GlassCardTitle>
-                      <GlassCardDescription>
-                        Archived {formatRelativeTime(session.lastAccessed)}
-                      </GlassCardDescription>
-                    </div>
-                    <StatusIndicator status="disconnected" label="Archived" size="sm" />
-                  </GlassCardHeader>
-                  <GlassCardContent className="space-y-2 text-sm text-slate-300">
-                    <p>Room ID: {session.roomId}</p>
-                    <p>Created {formatRelativeTime(session.createdAt)}</p>
-                  </GlassCardContent>
-                  <div className="flex gap-2 border-t border-white/10 px-6 py-4">
-                    <Button size="sm" variant="ghost" onClick={() => handleJoin(session.roomId)}>
-                      Reopen
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleShareLink(session.roomId)}>
-                      Share
-                    </Button>
-                  </div>
-                </GlassCard>
-              ))}
-            </div>
-          </section>
-        )}
+
+
+
+        <div className="pb-10" />
       </div>
     </div>
   );

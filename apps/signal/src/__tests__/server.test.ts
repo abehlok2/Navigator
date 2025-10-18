@@ -89,6 +89,7 @@ describe('signal server websocket forwarding', () => {
   let createRoom: typeof import('../rooms.ts').createRoom;
   let addParticipant: typeof import('../rooms.ts').addParticipant;
   let listParticipants: typeof import('../rooms.ts').listParticipants;
+  let getFacilitator: typeof import('../rooms.ts').getFacilitator;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -101,6 +102,7 @@ describe('signal server websocket forwarding', () => {
     createRoom = rooms.createRoom;
     addParticipant = rooms.addParticipant;
     listParticipants = rooms.listParticipants;
+    getFacilitator = rooms.getFacilitator;
   });
 
   afterEach(() => {
@@ -114,7 +116,7 @@ describe('signal server websocket forwarding', () => {
     if (!handler) return;
 
     const room = createRoom('room-forward');
-    const sender = addParticipant(room.id, 'facilitator');
+    const sender = getFacilitator(room.id)!;
     const receiver = addParticipant(room.id, 'explorer');
 
     const tokenMap = new Map<string, { username: string; role: string }>([
@@ -184,7 +186,7 @@ describe('signal server websocket forwarding', () => {
     if (!handler) return;
 
     const room = createRoom('room-listener');
-    const facilitator = addParticipant(room.id, 'facilitator');
+    const facilitator = getFacilitator(room.id)!;
     const listener = addParticipant(room.id, 'listener');
 
     const tokenMap = new Map<string, { username: string; role: string }>([
@@ -242,7 +244,7 @@ describe('signal server websocket forwarding', () => {
     if (!handler) return;
 
     const room = createRoom('room-close');
-    const facilitator = addParticipant(room.id, 'facilitator');
+    const facilitator = getFacilitator(room.id)!;
 
     const tokenMap = new Map<string, { username: string; role: string }>([
       ['token-facilitator', { username: 'facilitator', role: 'facilitator' }],
