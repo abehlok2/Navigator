@@ -3,7 +3,7 @@ import cors from 'cors';
 import { createServer as createHttpsServer } from 'https';
 import { createServer as createHttpServer, type IncomingMessage } from 'http';
 import { readFileSync, existsSync } from 'fs';
-import { WebSocketServer, type WebSocket, type RawData } from 'ws';
+import { WebSocketServer, WebSocket, type RawData } from 'ws';
 import rateLimit from 'express-rate-limit';
 import {
   authenticate,
@@ -15,6 +15,7 @@ import {
   UserExistsError,
 } from './auth.js';
 import { messageSchema, roleSchema, type Role, type WireMessage } from './types.js';
+import { loadUsers, saveUsers } from './storage.js';
 import {
   createRoom,
   addParticipant,
@@ -274,6 +275,8 @@ if (useHttps) {
 
 const wss = new WebSocketServer({ server });
 
+const pendingMessages = new Map<string, string[]>();
+
 setInterval(() => cleanupInactiveParticipants(SESSION_TIMEOUT_MS), SESSION_TIMEOUT_MS);
 setInterval(() => cleanupExpiredTokens(TOKEN_TIMEOUT_MS), TOKEN_TIMEOUT_MS);
 
@@ -298,6 +301,21 @@ wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
   attachSocket(roomId, participantId, ws);
   touchParticipant(roomId, participantId);
 
+  const queued = pendingMessages.get(participantId);
+  if (queued?.length) {
+    for (const message of queued) {
+      try {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(message);
+        }
+      } catch (err) {
+        console.error('Failed to deliver queued message', err);
+        break;
+      }
+    }
+    pendingMessages.delete(participantId);
+  }
+
   ws.on('message', (data: RawData) => {
     touchParticipant(roomId, participantId);
     let msg: WireMessage;
@@ -319,8 +337,19 @@ wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
     }
 
     const target = getParticipant(roomId, msg.target);
-    if (!target?.ws) {
-      ws.send(JSON.stringify({ type: 'error', error: 'target not available' }));
+    if (!target) {
+      ws.send(JSON.stringify({ type: 'error', error: 'target not found' }));
+      return;
+    }
+
+    if (!target.ws || target.ws.readyState !== WebSocket.OPEN) {
+      const serialized = JSON.stringify({ ...msg, from: participantId });
+      const queue = pendingMessages.get(msg.target);
+      if (queue) {
+        queue.push(serialized);
+      } else {
+        pendingMessages.set(msg.target, [serialized]);
+      }
       return;
     }
 
@@ -329,6 +358,7 @@ wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
 
   ws.on('close', () => {
     removeParticipant(roomId, participantId);
+    pendingMessages.delete(participantId);
   });
 
   ws.send(JSON.stringify({ type: 'credentials', payload: TURN_CONFIG }));
