@@ -131,6 +131,7 @@ const AppRouter: React.FC = () => {
       <Route path="/auth" element={token ? <Navigate to="/" replace /> : <AuthForm />} />
       <Route element={<ProtectedLayout />}>
         <Route index element={<DashboardPage />} />
+        <Route path="join/:roomId" element={<DashboardPage />} />
         <Route path="session/:roomId" element={<SessionPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
