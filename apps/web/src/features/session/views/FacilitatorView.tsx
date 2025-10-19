@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
-import AssetLibrary from '../../assets/components/AssetLibrary';
-import FacilitatorMixerPanel from '../../audio/components/FacilitatorMixerPanel';
 import DuckingEditor from '../../audio/components/DuckingEditor';
 import ParticipantGrid, { type ParticipantGridProps } from '../../room/components/ParticipantGrid';
 import { useSessionStore } from '../../../state/session';
@@ -18,12 +16,6 @@ import { cn } from '../../../lib/utils';
 import type { TelemetryLevels } from '../../control/protocol';
 import type { ConnectionStatus } from '../../../state/session';
 
-const MOBILE_SECTIONS = [
-  { id: 'assets', label: 'Assets' },
-  { id: 'mixer', label: 'Mixer' },
-  { id: 'participants', label: 'Participants' },
-] as const;
-
 const collapseVariants = {
   initial: { height: 0, opacity: 0 },
   animate: {
@@ -37,8 +29,6 @@ const collapseVariants = {
     transition: { duration: 0.25, ease: 'easeIn' as const },
   },
 };
-
-type MobileSectionId = (typeof MOBILE_SECTIONS)[number]['id'];
 type PanelKey = 'ducking' | 'telemetry';
 
 type FacilitatorViewProps = Pick<
@@ -244,31 +234,6 @@ function ToggleButton({
   );
 }
 
-function MobileTabButton({
-  active,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'flex-1 min-w-[140px] rounded-full border px-4 py-2 text-sm font-semibold tracking-wide text-slate-200 transition',
-        active
-          ? 'border-white/40 bg-white/20 text-white shadow-lg shadow-sky-500/20'
-          : 'border-white/10 bg-white/[0.06] hover:border-white/25 hover:bg-white/[0.12]'
-      )}
-    >
-      {label}
-    </button>
-  );
-}
-
 export default function FacilitatorView({
   participants = [],
   currentParticipantId,
@@ -309,33 +274,28 @@ export default function FacilitatorView({
   }, [manifest, remoteAssets, remoteMissing]);
 
   const heartbeatAgeMs = useHeartbeatAge(lastHeartbeat);
-  const [mobileSection, setMobileSection] = useState<MobileSectionId>('mixer');
   const [panels, setPanels] = useState<Record<PanelKey, boolean>>({ ducking: true, telemetry: true });
 
   const togglePanel = (panel: PanelKey) => {
     setPanels(prev => ({ ...prev, [panel]: !prev[panel] }));
   };
 
-  const mobileContent: Record<MobileSectionId, React.ReactNode> = {
-    assets: <AssetLibrary />,
-    mixer: <FacilitatorMixerPanel />,
-    participants: (
-      <ParticipantGrid
-        participants={participants}
-        currentParticipantId={currentParticipantId}
-        selectedParticipantId={selectedParticipantId}
-        selectableParticipantIds={selectableParticipantIds}
-        onSelectParticipant={onSelectParticipant}
-        canModerate={canModerate}
-        onChangeRole={onChangeRole}
-        onRemoveParticipant={onRemoveParticipant}
-        pendingModeration={pendingModeration}
-      />
-    ),
-  };
-
   return (
-    <FacilitatorLayout>
+    <FacilitatorLayout
+      participantPanel={
+        <ParticipantGrid
+          participants={participants}
+          currentParticipantId={currentParticipantId}
+          selectedParticipantId={selectedParticipantId}
+          selectableParticipantIds={selectableParticipantIds}
+          onSelectParticipant={onSelectParticipant}
+          canModerate={canModerate}
+          onChangeRole={onChangeRole}
+          onRemoveParticipant={onRemoveParticipant}
+          pendingModeration={pendingModeration}
+        />
+      }
+    >
       <div className="flex flex-col gap-8">
         <GlassCard variant="default" glowColor="green" className="border-white/5 bg-white/[0.03]">
           <GlassCardHeader className="flex-col gap-4 text-slate-200 sm:flex-row sm:items-center sm:justify-between">
@@ -355,71 +315,6 @@ export default function FacilitatorView({
             </div>
           </GlassCardHeader>
         </GlassCard>
-
-        <div className="lg:hidden">
-          <SectionTitle title="Control surface" />
-          <div className="mt-4 flex flex-wrap gap-2">
-            {MOBILE_SECTIONS.map(section => (
-              <MobileTabButton
-                key={section.id}
-                label={section.label}
-                active={mobileSection === section.id}
-                onClick={() => setMobileSection(section.id)}
-              />
-            ))}
-          </div>
-          <div className="mt-6">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={mobileSection}
-                initial={{ opacity: 0, y: 24 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -24 }}
-                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                className="flex flex-col gap-6"
-              >
-                {mobileContent[mobileSection]}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-        </div>
-
-        <div className="hidden lg:grid gap-6 lg:[grid-template-columns:minmax(0,1.05fr)_minmax(0,1.25fr)] xl:[grid-template-columns:minmax(0,1fr)_minmax(0,1.35fr)_minmax(0,0.95fr)]">
-          <motion.section
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, ease: 'easeOut' }}
-            className="flex flex-col gap-6"
-          >
-            <AssetLibrary />
-          </motion.section>
-          <motion.section
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, ease: 'easeOut' }}
-            className="flex flex-col gap-6"
-          >
-            <FacilitatorMixerPanel />
-          </motion.section>
-          <motion.section
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, ease: 'easeOut' }}
-            className="flex flex-col gap-6 lg:col-span-2 xl:col-span-1"
-          >
-            <ParticipantGrid
-              participants={participants}
-              currentParticipantId={currentParticipantId}
-              selectedParticipantId={selectedParticipantId}
-              selectableParticipantIds={selectableParticipantIds}
-              onSelectParticipant={onSelectParticipant}
-              canModerate={canModerate}
-              onChangeRole={onChangeRole}
-              onRemoveParticipant={onRemoveParticipant}
-              pendingModeration={pendingModeration}
-            />
-          </motion.section>
-        </div>
 
         <section className="space-y-4">
           <SectionTitle title="Signal processing" />

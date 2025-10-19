@@ -2,9 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { AnimatePresence, motion, cubicBezier, type Transition, type Variants } from 'framer-motion';
 
 import AssetLibrary from '../../assets/components/AssetLibrary';
-import RecordingStudio from '../../recording/components/RecordingStudio';
 import RecordingLibrary from '../../recording/components/RecordingLibrary';
-import ConnectionStatus from '../ConnectionStatus';
 import { ExplorerLayout } from '../../../layouts/RoleLayouts';
 import {
   GlassCard,
@@ -14,7 +12,6 @@ import {
   GlassCardTitle,
 } from '../../../components/ui/glass-card';
 import { Button } from '../../../components/ui/button';
-import { StatusIndicator } from '../../../components/ui/status-indicator';
 import { cn } from '../../../lib/utils';
 import { formatBytes } from '../../../lib/format';
 import { useSessionStore } from '../../../state/session';
@@ -55,21 +52,12 @@ const toneClasses: Record<'positive' | 'neutral' | 'warning', string> = {
   warning: 'text-amber-300',
 };
 
-function formatDbfs(value: number | null | undefined) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return '—';
-  }
-  return `${value.toFixed(1)} dBFS`;
-}
-
 export default function ExplorerView() {
-  const { manifest, assets, remoteAssets, remoteMissing, telemetry, connection } = useSessionStore(state => ({
+  const { manifest, assets, remoteAssets, remoteMissing } = useSessionStore(state => ({
     manifest: state.manifest,
     assets: state.assets,
     remoteAssets: state.remoteAssets,
     remoteMissing: state.remoteMissing,
-    telemetry: state.telemetry,
-    connection: state.connection,
   }));
   const recordings = useRecordingLibraryStore(state => state.recordings);
 
@@ -96,99 +84,12 @@ export default function ExplorerView() {
 
   const pendingBytes = Math.max(0, totalBytes - localBytes);
 
-  const latestRecording = useMemo(() => {
-    if (!recordings.length) return null;
-    return recordings.reduce((latest, item) => (latest.createdAt > item.createdAt ? latest : item));
-  }, [recordings]);
-
   const [libraryOpen, setLibraryOpen] = useState(recordings.length > 0);
 
   return (
     <ExplorerLayout>
-      <motion.div
-        initial="hidden"
-        animate="visible"
-        className="flex min-h-screen flex-col gap-8 pb-10"
-      >
+      <motion.div initial="hidden" animate="visible" className="flex min-h-screen flex-col gap-8 pb-10">
         <motion.section variants={sectionVariants} custom={0} className="w-full">
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
-            <GlassCard variant="elevated" glowColor="purple" className="overflow-hidden">
-              <GlassCardHeader className="flex-col gap-3 border-white/10 pb-6">
-                <div className="flex items-center gap-3 text-xs uppercase tracking-[0.35em] text-slate-400">
-                  <StatusIndicator status={connection === 'connected' ? 'connected' : connection === 'connecting' ? 'connecting' : 'disconnected'} />
-                  <span>Explorer capture</span>
-                </div>
-                <div className="space-y-2">
-                  <GlassCardTitle className="text-2xl text-white">Recording studio</GlassCardTitle>
-                  <GlassCardDescription className="text-sm text-slate-200/80">
-                    Arm, monitor, and capture the explorer feed with streamlined controls tailored for field work.
-                  </GlassCardDescription>
-                </div>
-              </GlassCardHeader>
-              <GlassCardContent className="px-0 pb-0">
-                <RecordingStudio />
-              </GlassCardContent>
-            </GlassCard>
-
-            <div className="flex flex-col gap-6">
-              <ConnectionStatus />
-
-              <GlassCard variant="default" glowColor="blue" className="h-full">
-                <GlassCardHeader className="border-white/10 pb-5">
-                  <GlassCardTitle className="text-lg text-white">Live mix snapshot</GlassCardTitle>
-                  <GlassCardDescription className="text-sm text-slate-200/80">
-                    Confidence monitors for current capture health and recently logged takes.
-                  </GlassCardDescription>
-                </GlassCardHeader>
-                <GlassCardContent className="gap-5">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <StatusMetric
-                      label="Program bus"
-                      value={formatDbfs(telemetry?.program ?? null)}
-                      helper="Post-mix level"
-                      tone={telemetry?.program && telemetry.program > -12 ? 'positive' : 'neutral'}
-                    />
-                    <StatusMetric
-                      label="Mic return"
-                      value={formatDbfs(telemetry?.mic ?? null)}
-                      helper="Facilitator commentary"
-                      tone={telemetry?.mic && telemetry.mic > -18 ? 'positive' : 'neutral'}
-                    />
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-200">
-                    {recordings.length ? (
-                      <div className="flex flex-col gap-1">
-                        <span className="text-xs uppercase tracking-[0.35em] text-slate-400">
-                          Library
-                        </span>
-                        <span className="text-lg font-semibold text-white">
-                          {recordings.length} {recordings.length === 1 ? 'take captured' : 'takes captured'}
-                        </span>
-                        {latestRecording ? (
-                          <span className="text-xs text-slate-300/80">
-                            Latest take saved {new Date(latestRecording.createdAt).toLocaleString()}
-                          </span>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-1">
-                        <span className="text-xs uppercase tracking-[0.35em] text-slate-400">
-                          Library
-                        </span>
-                        <span className="text-lg font-semibold text-white">No captured takes yet</span>
-                        <span className="text-xs text-slate-300/80">
-                          Takes will appear here the moment you finish a recording.
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </GlassCardContent>
-              </GlassCard>
-            </div>
-          </div>
-        </motion.section>
-
-        <motion.section variants={sectionVariants} custom={1} className="w-full">
           <GlassCard variant="elevated" glowColor="cyan" className="overflow-hidden">
             <GlassCardHeader className="flex flex-col gap-5 border-white/10 pb-6 lg:flex-row lg:items-start lg:justify-between">
               <div className="space-y-2">
@@ -237,7 +138,7 @@ export default function ExplorerView() {
           </GlassCard>
         </motion.section>
 
-        <motion.section variants={sectionVariants} custom={2} className="w-full">
+        <motion.section variants={sectionVariants} custom={1} className="w-full">
           <GlassCard variant="default" glowColor="purple" className="overflow-hidden">
             <GlassCardHeader className="flex flex-col gap-4 border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -281,23 +182,6 @@ export default function ExplorerView() {
         </motion.section>
       </motion.div>
     </ExplorerLayout>
-  );
-}
-
-interface StatusMetricProps {
-  label: string;
-  value: string;
-  helper?: string;
-  tone?: keyof typeof toneClasses;
-}
-
-function StatusMetric({ label, value, helper, tone = 'neutral' }: StatusMetricProps) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-      <p className="text-[0.65rem] uppercase tracking-[0.35em] text-slate-400">{label}</p>
-      <p className={cn('mt-3 text-2xl font-semibold text-white', toneClasses[tone])}>{value}</p>
-      {helper ? <p className="mt-2 text-xs text-slate-300/80">{helper}</p> : null}
-    </div>
   );
 }
 
