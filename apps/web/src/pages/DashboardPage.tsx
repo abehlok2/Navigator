@@ -69,6 +69,48 @@ const parseInviteValue = (value: string | null | undefined): string => {
   }
 };
 
+const SAMPLE_STATUS = new Set(['sample', 'demo', 'example', 'mock']);
+
+const isTruthy = (value: unknown): boolean => value === true || value === 'true';
+
+const isSampleSession = (record: Partial<StoredSession> & {
+  status?: unknown;
+  source?: unknown;
+  isSample?: unknown;
+  sample?: unknown;
+  roomId?: unknown;
+  label?: unknown;
+}): boolean => {
+  const status = typeof record.status === 'string' ? record.status.trim().toLowerCase() : null;
+  if (status && (status !== 'active' || SAMPLE_STATUS.has(status))) {
+    return true;
+  }
+
+  const source = typeof record.source === 'string' ? record.source.trim().toLowerCase() : null;
+  if (source && (source !== 'active' || SAMPLE_STATUS.has(source))) {
+    return true;
+  }
+
+  if (isTruthy(record.isSample) || isTruthy(record.sample)) {
+    return true;
+  }
+
+  const roomId = typeof record.roomId === 'string' ? record.roomId.trim() : null;
+  if (!roomId) {
+    return true;
+  }
+  if (SAMPLE_STATUS.has(roomId.toLowerCase())) {
+    return true;
+  }
+
+  const label = typeof record.label === 'string' ? record.label.trim().toLowerCase() : null;
+  if (label && SAMPLE_STATUS.has(label)) {
+    return true;
+  }
+
+  return false;
+};
+
 const readStoredSessions = (): StoredSession[] => {
   if (typeof window === 'undefined') return [];
   const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -79,9 +121,17 @@ const readStoredSessions = (): StoredSession[] => {
     return parsed
       .map(item => {
         if (!item || typeof item !== 'object') return null;
-        const record = item as Partial<StoredSession> & { roomId?: string; status?: string };
+        const record = item as Partial<StoredSession> & {
+          roomId?: string;
+          status?: string;
+          source?: string;
+          isSample?: boolean | string;
+          sample?: boolean | string;
+          label?: string;
+        };
         if (!record.roomId) return null;
         if (record.status === 'ended') return null;
+        if (isSampleSession(record)) return null;
         const now = new Date().toISOString();
         return {
           roomId: record.roomId,
