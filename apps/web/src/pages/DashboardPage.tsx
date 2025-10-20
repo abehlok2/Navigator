@@ -14,7 +14,13 @@ import { StatusIndicator } from '../components/ui/status-indicator';
 import { Input } from '../components/ui/input';
 import { useAuthStore } from '../state/auth';
 import { useSessionStore } from '../state/session';
-import { createRoom, listParticipants, type ParticipantSummary, type Role } from '../features/session/api';
+import {
+  RoomNotFoundError,
+  createRoom,
+  listParticipants,
+  type ParticipantSummary,
+  type Role,
+} from '../features/session/api';
 import { cn } from '../lib/utils';
 
 const STORAGE_KEY = 'navigator-dashboard-sessions';
@@ -196,6 +202,7 @@ export default function DashboardPage() {
   const [joinValue, setJoinValue] = useState('');
   const [joinError, setJoinError] = useState<string | null>(null);
   const [copiedRoomId, setCopiedRoomId] = useState<string | null>(null);
+  const [notification, setNotification] = useState<string | null>(null);
   
 
   const inviteFromLocation = useMemo(() => {
@@ -247,20 +254,45 @@ export default function DashboardPage() {
     }
     let cancelled = false;
     (async () => {
-      const entries = await Promise.all(
+      const expiredRooms = new Set<string>();
+      const entries = (await Promise.all(
         sessions.map(async session => {
           try {
             const participants = await listParticipants(session.roomId, token);
             return [session.roomId, participants] as const;
           } catch (err) {
+            if (err instanceof RoomNotFoundError) {
+              expiredRooms.add(session.roomId);
+              return null;
+            }
             console.error('Failed to load participants for session', session.roomId, err);
             return [session.roomId, []] as const;
           }
         }),
-      );
+      ))
+        .filter((entry): entry is readonly [string, ParticipantSummary[]] => entry !== null);
       if (cancelled) return;
+      if (expiredRooms.size > 0) {
+        const expiredLabels = sessions
+          .filter(session => expiredRooms.has(session.roomId))
+          .map(session => session.label);
+        setSessions(prev => prev.filter(session => !expiredRooms.has(session.roomId)));
+        setNotification(() => {
+          if (expiredLabels.length === 1) {
+            return `${expiredLabels[0]} has expired and was removed from your dashboard.`;
+          }
+          if (expiredLabels.length > 1) {
+            const labelList = expiredLabels.join(', ');
+            return `The following sessions expired and were removed: ${labelList}.`;
+          }
+          return 'One or more sessions expired and were removed from your dashboard.';
+        });
+      }
       setPresence(current => {
         const next = { ...current };
+        expiredRooms.forEach(roomId => {
+          delete next[roomId];
+        });
         entries.forEach(([roomId, participants]) => {
           next[roomId] = participants;
         });
@@ -389,6 +421,22 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-1 flex-col bg-slate-950 text-white">
       <div className="mx-auto w-full max-w-6xl px-6 py-10 space-y-10">
+        {notification ? (
+          <div className="rounded-2xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/90">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p>{notification}</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-amber-100/90 hover:text-amber-50"
+                onClick={() => setNotification(null)}
+              >
+                Dismiss
+              </Button>
+            </div>
+          </div>
+        ) : null}
         <header className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h1 className="text-3xl font-semibold text-white">Mission Dashboard</h1>

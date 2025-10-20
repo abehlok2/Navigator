@@ -30,6 +30,7 @@ import {
 } from '../features/audio/speech';
 import {
   createRoom,
+  RoomNotFoundError,
   joinRoom,
   leaveRoom,
   listParticipants,
@@ -991,8 +992,32 @@ export default function SessionPage() {
   const [showConnectedBanner, setShowConnectedBanner] = useState(false);
   const [recording, setRecording] = useState(false);
   const [muted, setMuted] = useState(true);
+  const [roomExpired, setRoomExpired] = useState(false);
 
-  const resetError = useCallback(() => setError(null), []);
+  const resetError = useCallback(() => {
+    setError(null);
+    setRoomExpired(false);
+  }, []);
+
+  const handleRoomExpiration = useCallback((message?: string) => {
+    const session = useSessionStore.getState();
+    setRoomExpired(true);
+    setError(
+      message ??
+        'This room is no longer available. Create a new session before attempting to reconnect.'
+    );
+    setParticipants([]);
+    setParticipantId(null);
+    setTargetId('');
+    setTurnServers([]);
+    session.setRole(null);
+    session.setConnection('disconnected');
+    session.setControl(null);
+    session.setTelemetry(null);
+    session.setPeerClock(null);
+    session.setMicStream(null);
+    session.resetRemotePresence();
+  }, []);
 
   useEffect(() => {
     if (typeof routeRoomId === 'string') {
@@ -1067,14 +1092,19 @@ export default function SessionPage() {
     setError(null);
     try {
       const list = await listParticipants(roomId, token);
+      setRoomExpired(false);
       setParticipants(list);
     } catch (err) {
+      if (err instanceof RoomNotFoundError) {
+        handleRoomExpiration();
+        return;
+      }
       console.error(err);
       setError('Failed to load participants');
     } finally {
       setLoadingParticipants(false);
     }
-  }, [roomId, token]);
+  }, [handleRoomExpiration, roomId, token]);
 
   const handleSetRoomPassword = useCallback(async () => {
     if (!token) {
@@ -1137,6 +1167,7 @@ export default function SessionPage() {
     setError(null);
     try {
       const created = await createRoom(token, authRole);
+      setRoomExpired(false);
       setRoomId(created.roomId);
       setParticipants(created.participants);
       setParticipantId(created.participantId);
@@ -1168,6 +1199,7 @@ export default function SessionPage() {
     setConnectionStage('preparing');
     setConnecting(true);
     setError(null);
+    setRoomExpired(false);
     const previousDisconnect = disconnectRef.current;
     disconnectRef.current = null;
     previousDisconnect?.();
@@ -1260,7 +1292,11 @@ export default function SessionPage() {
     } catch (err) {
       console.error(err);
       leaveIfNeeded();
-      if (err instanceof Error && err.message === 'target-unavailable') {
+      if (err instanceof RoomNotFoundError) {
+        handleRoomExpiration(
+          'This room has expired. Create a new session from the dashboard before reconnecting.'
+        );
+      } else if (err instanceof Error && err.message === 'target-unavailable') {
         setError('No available participants to connect');
       } else {
         setError('Failed to connect to room');
@@ -1272,6 +1308,7 @@ export default function SessionPage() {
     authRole,
     cleanupRemoteAudio,
     effectiveRole,
+    handleRoomExpiration,
     handleTrack,
     joinPassword,
     participantId,
@@ -1295,6 +1332,7 @@ export default function SessionPage() {
       setParticipants([]);
       setTargetId('');
       setTurnServers([]);
+      setRoomExpired(false);
       useSessionStore.getState().setRole(null);
       return;
     }
@@ -1323,6 +1361,7 @@ export default function SessionPage() {
     setTargetId('');
     setTurnServers([]);
     setPendingModeration(null);
+    setRoomExpired(false);
     session.setRole(null);
   }, [cleanupRemoteAudio, participantId, roomId, token]);
 
@@ -1622,6 +1661,12 @@ export default function SessionPage() {
             leaving={leavingRoom}
             roleLabel={formatRole(effectiveRole)}
           />
+          {roomExpired ? (
+            <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/90">
+              This room has expired. Create a fresh session from the dashboard or use "Create new room"
+              to continue facilitating.
+            </div>
+          ) : null}
           <AnimatePresence>
             {showConnectedBanner ? <ConnectedBanner roomId={roomId} /> : null}
           </AnimatePresence>
