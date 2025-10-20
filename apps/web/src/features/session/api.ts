@@ -2,6 +2,16 @@ import { apiUrl } from '../../config';
 
 export type Role = 'facilitator' | 'explorer' | 'listener';
 
+export class RoomNotFoundError extends Error {
+  payload?: unknown;
+
+  constructor(message: string, payload?: unknown) {
+    super(message);
+    this.name = 'RoomNotFoundError';
+    this.payload = payload;
+  }
+}
+
 function logError(context: string, details?: Record<string, unknown>): void {
   if (details && Object.keys(details).length > 0) {
     console.error(`[Session API] ${context}`, details);
@@ -46,6 +56,23 @@ function authHeaders(token: string): HeadersInit {
   return {
     Authorization: `Bearer ${normalized}`,
   };
+}
+
+function isRoomNotFound(status: number, message: string, payload?: unknown): boolean {
+  if (status === 404) return true;
+  const normalized = message.trim().toLowerCase();
+  if (normalized.includes('room not found')) return true;
+  if (normalized === 'room-not-found') return true;
+  if (payload && typeof payload === 'object') {
+    const candidate = (payload as Record<string, unknown>).code;
+    if (typeof candidate === 'string') {
+      const code = candidate.trim().toLowerCase();
+      if (code === 'room_not_found' || code === 'room-not-found') {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 export interface CreateRoomResponse {
@@ -135,6 +162,9 @@ export async function joinRoom(
       errorMessage,
       errorPayload: payload,
     });
+    if (isRoomNotFound(res.status, errorMessage, payload)) {
+      throw new RoomNotFoundError(errorMessage || 'Room not found', payload);
+    }
     throw new Error(errorMessage);
   }
   const data = (await res.json()) as {
@@ -178,6 +208,9 @@ export async function listParticipants(roomId: string, token: string): Promise<P
       errorMessage,
       errorPayload: payload,
     });
+    if (isRoomNotFound(res.status, errorMessage, payload)) {
+      throw new RoomNotFoundError(errorMessage || 'Room not found', payload);
+    }
     throw new Error(errorMessage);
   }
   const data = (await res.json()) as { participants?: ParticipantSummary[] };
