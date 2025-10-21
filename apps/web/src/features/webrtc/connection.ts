@@ -30,9 +30,10 @@ interface ConnectResult {
 
 export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
   const pc = new RTCPeerConnection({ iceServers: opts.turn });
+  const session = useSessionStore.getState();
+  session.setPeerConnection(pc);
   let dataChannel: RTCDataChannel | undefined;
   let control: ControlChannel | undefined;
-  const session = useSessionStore.getState();
   session.setRole(opts.role);
   session.setConnection('connecting');
   session.resetRemotePresence();
@@ -114,6 +115,7 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
       session.setTelemetry(null);
       control?.setMicStream(null);
       session.setMicStream(null);
+      session.setPeerConnection(null);
       session.resetRemotePresence();
       closeSignal();
     };
@@ -274,6 +276,7 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
     session.setTelemetry(null);
     session.setMicStream(null);
     session.setPeerClock(null);
+    session.setPeerConnection(null);
     session.resetRemotePresence();
     throw err;
   }
@@ -304,9 +307,11 @@ export function connectWithReconnection(
       if (stopped) {
         closeSignal();
         pc.close();
+        session.setPeerConnection(null);
         return;
       }
       dc?.addEventListener('close', () => {
+        session.setPeerConnection(null);
         if (!stopped) setTimeout(attempt, opts.retryDelayMs ?? 1000);
       });
       pc.addEventListener('connectionstatechange', () => {
@@ -317,6 +322,7 @@ export function connectWithReconnection(
         ) {
           session.setConnection('disconnected');
           closeSignal();
+          session.setPeerConnection(null);
           if (!stopped) {
             setTimeout(attempt, opts.retryDelayMs ?? 1000);
           }
@@ -324,6 +330,7 @@ export function connectWithReconnection(
       });
     } catch {
       session.setConnection('disconnected');
+      session.setPeerConnection(null);
       if (!stopped) setTimeout(attempt, opts.retryDelayMs ?? 1000);
     }
   };
@@ -334,5 +341,6 @@ export function connectWithReconnection(
     stopped = true;
     current?.close();
     currentSignalClose?.();
+    session.setPeerConnection(null);
   };
 }
