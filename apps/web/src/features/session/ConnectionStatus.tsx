@@ -21,6 +21,7 @@ import {
 } from '../../components/ui/glass-card';
 import { Button } from '../../components/ui/button';
 import { StatusIndicator, type StatusIndicatorStatus } from '../../components/ui/status-indicator';
+import AudioQualityIndicator from '../../components/session/AudioQualityIndicator';
 import { cn } from '../../lib/utils';
 import { useSessionStore, type ConnectionStatus as SessionConnectionStatus } from '../../state/session';
 
@@ -441,6 +442,7 @@ export default function ConnectionStatus() {
             </div>
           </div>
           <div className="grid gap-5">
+            <AudioQualityIndicator />
             <MetricTile
               label="Latency"
               value={latencyMs === null ? '—' : `${latencyMs} ms`}

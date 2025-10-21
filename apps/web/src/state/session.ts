@@ -26,6 +26,7 @@ interface SessionState {
   lastHeartbeat: number | null;
   peerClock: PeerClock | null;
   micStream: MediaStream | null;
+  peerConnection: RTCPeerConnection | null;
   setRole: (role: Role | null) => void;
   setConnection: (status: ConnectionStatus) => void;
   setControl: (control: ControlChannel | null) => void;
@@ -39,6 +40,7 @@ interface SessionState {
   setTelemetry: (t: TelemetryLevels | null) => void;
   setHeartbeat: () => void;
   setMicStream: (stream: MediaStream | null) => void;
+  setPeerConnection: (pc: RTCPeerConnection | null) => void;
 }
 
 const computePresence = (manifest: Record<string, ManifestEntry>, assets: Set<string>) => {
@@ -62,6 +64,7 @@ export const useSessionStore = create<SessionState>(set => ({
   lastHeartbeat: null,
   peerClock: null,
   micStream: null,
+  peerConnection: null,
   setRole: role => set({ role }),
   setConnection: status => set({ connection: status }),
   setControl: control => set({ control }),
@@ -168,4 +171,5 @@ export const useSessionStore = create<SessionState>(set => ({
   setTelemetry: t => set({ telemetry: t }),
   setHeartbeat: () => set({ lastHeartbeat: Date.now() }),
   setMicStream: stream => set({ micStream: stream }),
+  setPeerConnection: pc => set({ peerConnection: pc }),
 }));
